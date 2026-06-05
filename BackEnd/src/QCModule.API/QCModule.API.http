@@ -1,0 +1,6 @@
+@QCModule.API_HostAddress = http://localhost:5065
+
+GET {{QCModule.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

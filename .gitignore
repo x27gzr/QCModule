@@ -1,0 +1,37 @@
+# ── .NET ──────────────────────────────────────────────────────────────────────
+BackEnd/**/bin/
+BackEnd/**/obj/
+BackEnd/**/*.user
+BackEnd/**/*.suo
+BackEnd/.vs/
+BackEnd/**/logs/
+BackEnd/**/*.log
+
+# Secrets — use environment variables or dotnet user-secrets in production
+# appsettings.json is committed but with placeholder values only
+BackEnd/**/appsettings.Production.json
+BackEnd/**/appsettings.Staging.json
+
+# EF Core migrations bundle
+BackEnd/**/efbundle
+
+# ── Node / Vite ───────────────────────────────────────────────────────────────
+FrontEnd/node_modules/
+FrontEnd/dist/
+FrontEnd/.env
+FrontEnd/.env.local
+FrontEnd/.env.*.local
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Project lama (tidak diikutkan) ────────────────────────────────────────────
+PROJECT lama/
