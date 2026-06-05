@@ -11,6 +11,7 @@ const QCResults   = lazy(() => import("@/pages/qc-results"));
 const DoctorAuth  = lazy(() => import("@/pages/doctor-authorisation"));
 const Reports     = lazy(() => import("@/pages/reports"));
 const ActivityLogs = lazy(() => import("@/pages/activity-logs"));
+const Settings     = lazy(() => import("@/pages/settings"));
 
 export const authRoutes = [
   { path: AUTH_ROUTES.SIGN_IN, element: <SignIn /> },
@@ -26,4 +27,5 @@ export const appRoutes = [
   { path: APP_ROUTES.DOCTOR_AUTH, element: <DoctorAuth /> },
   { path: APP_ROUTES.REPORTS,     element: <Reports /> },
   { path: APP_ROUTES.ACTIVITY_LOGS, element: <ActivityLogs /> },
+  { path: APP_ROUTES.SETTINGS,      element: <Settings /> },
 ];

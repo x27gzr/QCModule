@@ -63,6 +63,12 @@ export const NAV_ITEMS: NavItem[] = [
     iconName: "list",
     roles: ["Admin"],
   },
+  {
+    label: "Settings",
+    path: APP_ROUTES.SETTINGS,
+    iconName: "settings",
+    roles: ["Admin"],
+  },
 ];
 
 export const getNavForRole = (role: UserRole): NavItem[] =>

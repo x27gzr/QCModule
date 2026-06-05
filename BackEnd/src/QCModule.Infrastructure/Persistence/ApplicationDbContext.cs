@@ -16,6 +16,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<QCResult>          QCResults          => Set<QCResult>();
     public DbSet<WestgardRule>      WestgardRules      => Set<WestgardRule>();
     public DbSet<ActivityLog>       ActivityLogs       => Set<ActivityLog>();
+    public DbSet<AppSetting>        AppSettings        => Set<AppSetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,6 +49,27 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
              .WithMany()
              .HasForeignKey(rt => rt.UserId)
              .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── AppSettings (login customization) ─────────────────────────────────
+        modelBuilder.Entity<AppSetting>(e =>
+        {
+            e.HasIndex(s => s.Key).IsUnique();
+
+            AppSetting Seed(string guid, string key, string? value) => new()
+            {
+                Id = Guid.Parse(guid), Key = key, Value = value,
+                CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false
+            };
+
+            e.HasData(
+                Seed("b1000001-0000-0000-0000-000000000001", "login_background_preset", "gradient-blue"),
+                Seed("b1000001-0000-0000-0000-000000000002", "login_circle_color",      "blue"),
+                Seed("b1000001-0000-0000-0000-000000000003", "login_show_circle",        "true"),
+                Seed("b1000001-0000-0000-0000-000000000004", "login_logo_size",          "medium"),
+                Seed("b1000001-0000-0000-0000-000000000005", "app_title",                "QC Module"),
+                Seed("b1000001-0000-0000-0000-000000000006", "app_subtitle",             "Laboratory Quality Control")
+            );
         });
 
         // ── WestgardRules seed ────────────────────────────────────────────────

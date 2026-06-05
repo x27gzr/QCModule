@@ -40,6 +40,11 @@ public static class Permissions
         public const string View = "Permissions.ActivityLogs.View";
     }
 
+    public static class Settings
+    {
+        public const string Manage = "Permissions.Settings.Manage";
+    }
+
     // Defines which roles hold which permissions.
     // Policies are auto-registered from this map at startup — see ServiceExtensions.
     public static readonly IReadOnlyDictionary<string, string[]> RolePermissions =
@@ -52,7 +57,8 @@ public static class Permissions
                 QCSamples.View,   QCSamples.Manage,
                 QCResults.View,   QCResults.Create, QCResults.Validate, QCResults.Authorise, QCResults.Delete,
                 Reports.View,  Reports.Export,
-                ActivityLogs.View
+                ActivityLogs.View,
+                Settings.Manage
             ],
             ["Supervisor"] =
             [

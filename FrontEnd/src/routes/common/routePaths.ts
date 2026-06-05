@@ -12,4 +12,5 @@ export const APP_ROUTES = {
   DOCTOR_AUTH: "/doctor-authorisation",
   REPORTS:     "/reports",
   ACTIVITY_LOGS: "/activity-logs",
+  SETTINGS:      "/settings",
 };
