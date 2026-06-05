@@ -16,12 +16,16 @@ public static class DependencyInjection
     {
         services.Configure<JwtSettings>(options =>
         {
-            options.ExpiryMinutes         = int.Parse(configuration["Jwt:ExpiryMinutes"] ?? "30");
-            options.RefreshTokenExpiryDays = int.Parse(configuration["Jwt:RefreshTokenExpiryDays"] ?? "7");
+            var s = configuration.GetSection("JwtSettings");
+            options.SecretKey                    = s["SecretKey"]                       ?? string.Empty;
+            options.Issuer                       = s["Issuer"]                          ?? string.Empty;
+            options.Audience                     = s["Audience"]                        ?? string.Empty;
+            options.AccessTokenExpirationMinutes = int.TryParse(s["AccessTokenExpirationMinutes"], out var m) ? m : 30;
+            options.RefreshTokenExpirationDays   = int.TryParse(s["RefreshTokenExpirationDays"],   out var d) ? d : 7;
         });
 
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseNpgsql(
+            options.UseSqlServer(
                 configuration.GetConnectionString("DefaultConnection"),
                 b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
 

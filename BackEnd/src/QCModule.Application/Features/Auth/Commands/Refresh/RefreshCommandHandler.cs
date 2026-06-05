@@ -50,14 +50,14 @@ public class RefreshCommandHandler(
         // Rotate: revoke old token, issue a new one.
         await refreshTokenRepo.RevokeAsync(stored, cancellationToken);
 
-        var settings       = jwtSettings.Value;
-        var newRawToken    = GenerateSecureToken();
+        var settings    = jwtSettings.Value;
+        var newRawToken = GenerateSecureToken();
 
         await refreshTokenRepo.AddAsync(new RefreshToken
         {
             Token     = newRawToken,
             UserId    = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(settings.RefreshTokenExpiryDays)
+            ExpiresAt = DateTime.UtcNow.AddDays(settings.RefreshTokenExpirationDays)
         }, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -67,7 +67,7 @@ public class RefreshCommandHandler(
         var response = new AuthResponse(
             AccessToken: accessToken,
             TokenType:   "Bearer",
-            ExpiresIn:   settings.ExpiryMinutes * 60,
+            ExpiresIn:   settings.AccessTokenExpirationMinutes * 60,
             UserId:      user.Id,
             Name:        user.Name,
             Email:       user.Email,

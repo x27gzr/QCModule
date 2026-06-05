@@ -42,15 +42,15 @@ public class LoginCommandHandler(
         user.LastLoginAt = DateTime.UtcNow;
         await userRepo.UpdateAsync(user, cancellationToken);
 
-        var settings      = jwtSettings.Value;
-        var accessToken   = jwtService.GenerateToken(user, role.Name);
+        var settings        = jwtSettings.Value;
+        var accessToken     = jwtService.GenerateToken(user, role.Name);
         var rawRefreshToken = GenerateSecureToken();
 
         await refreshTokenRepo.AddAsync(new RefreshToken
         {
             Token     = rawRefreshToken,
             UserId    = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(settings.RefreshTokenExpiryDays)
+            ExpiresAt = DateTime.UtcNow.AddDays(settings.RefreshTokenExpirationDays)
         }, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -58,7 +58,7 @@ public class LoginCommandHandler(
         var response = new AuthResponse(
             AccessToken: accessToken,
             TokenType:   "Bearer",
-            ExpiresIn:   settings.ExpiryMinutes * 60,
+            ExpiresIn:   settings.AccessTokenExpirationMinutes * 60,
             UserId:      user.Id,
             Name:        user.Name,
             Email:       user.Email,

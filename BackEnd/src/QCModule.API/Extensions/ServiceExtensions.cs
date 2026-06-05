@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using QCModule.Application.Common.Authorization;
 using QCModule.Application.Common.Interfaces;
+using QCModule.Application.Common.Settings;
 using QCModule.API.Middleware;
 
 namespace QCModule.API.Extensions;
@@ -13,17 +14,19 @@ public static class ServiceExtensions
 {
     public static IServiceCollection AddJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
+        var jwt = configuration.GetSection("JwtSettings").Get<JwtSettings>()!;
+
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!)),
+                    IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SecretKey)),
                     ValidateIssuer           = true,
-                    ValidIssuer              = configuration["Jwt:Issuer"],
+                    ValidIssuer              = jwt.Issuer,
                     ValidateAudience         = true,
-                    ValidAudience            = configuration["Jwt:Audience"],
+                    ValidAudience            = jwt.Audience,
                     ClockSkew                = TimeSpan.Zero
                 };
             });
@@ -36,8 +39,6 @@ public static class ServiceExtensions
 
     public static IServiceCollection AddPermissionAuthorization(this IServiceCollection services)
     {
-        // Derive permission → roles mapping from the central Permissions table.
-        // Adding a new role or reassigning a permission only requires updating Permissions.RolePermissions.
         var permissionToRoles = Permissions.RolePermissions
             .SelectMany(kvp => kvp.Value.Select(perm => (Role: kvp.Key, Permission: perm)))
             .GroupBy(x => x.Permission)
@@ -48,8 +49,6 @@ public static class ServiceExtensions
             foreach (var (permission, roles) in permissionToRoles)
                 options.AddPolicy(permission, policy => policy.RequireRole(roles));
 
-            // All endpoints require authentication by default.
-            // Use [AllowAnonymous] explicitly for public endpoints (e.g. /auth/login).
             options.FallbackPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .Build();
@@ -65,11 +64,11 @@ public static class ServiceExtensions
             c.SwaggerDoc("v1", new OpenApiInfo { Title = "QC Module API", Version = "v1" });
             c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
-                Description = "JWT Authorization. Example: 'Bearer {token}'",
-                Name        = "Authorization",
-                In          = ParameterLocation.Header,
-                Type        = SecuritySchemeType.Http,
-                Scheme      = "Bearer",
+                Description  = "JWT Authorization. Example: 'Bearer {token}'",
+                Name         = "Authorization",
+                In           = ParameterLocation.Header,
+                Type         = SecuritySchemeType.Http,
+                Scheme       = "Bearer",
                 BearerFormat = "JWT"
             });
             c.AddSecurityRequirement(new OpenApiSecurityRequirement
