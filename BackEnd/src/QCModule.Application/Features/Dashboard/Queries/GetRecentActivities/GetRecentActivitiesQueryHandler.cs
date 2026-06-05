@@ -26,7 +26,8 @@ public class GetRecentActivitiesQueryHandler(
         var sampleMap = samples.ToDictionary(s => s.Id);
         var instrMap  = instruments.ToDictionary(i => i.Id, i => i.Name);
         var paramMap  = params_.ToDictionary(p => p.Id, p => p.ParameterName);
-        var userMap   = users.ToDictionary(u => u.Id, u => u.Name);
+        // Prefer the short nickname for activity display, fall back to full name.
+        var userMap   = users.ToDictionary(u => u.Id, u => string.IsNullOrWhiteSpace(u.Nickname) ? u.Name : u.Nickname!);
 
         var limit = Math.Clamp(request.Limit, 1, 50);
 

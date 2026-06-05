@@ -42,7 +42,7 @@ public class GetUsersQueryHandler(
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(u => new UserSummaryDto(
-                u.Id, u.Name, u.Email,
+                u.Id, u.Name, u.Nickname, u.Email,
                 roleMap.GetValueOrDefault(u.RoleId, "Unknown"),
                 u.IsActive))
             .ToList();

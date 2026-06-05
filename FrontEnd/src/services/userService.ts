@@ -3,6 +3,7 @@ import api from "@/utils/axios";
 export interface UserDto {
   id: string;
   name: string;
+  nickname: string | null;
   email: string;
   role: string;
   isActive: boolean;
@@ -13,6 +14,7 @@ export interface UserDto {
 export interface UserSummaryDto {
   id: string;
   name: string;
+  nickname: string | null;
   email: string;
   role: string;
   isActive: boolean;
@@ -38,6 +40,7 @@ export interface GetUsersParams {
 
 export interface CreateUserPayload {
   name: string;
+  nickname?: string;
   email: string;
   password: string;
   roleId: string;
@@ -45,6 +48,7 @@ export interface CreateUserPayload {
 
 export interface UpdateUserPayload {
   name: string;
+  nickname?: string;
   email: string;
   roleId: string;
 }

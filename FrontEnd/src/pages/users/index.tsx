@@ -124,7 +124,10 @@ export default function UsersPage() {
                     <div className="bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400 flex size-8 items-center justify-center rounded-full text-xs font-bold">
                       {u.name.charAt(0).toUpperCase()}
                     </div>
-                    {u.name}
+                    <div>
+                      <p>{u.name}</p>
+                      {u.nickname && <p className="text-xs font-normal text-gray-400 dark:text-dark-400">"{u.nickname}"</p>}
+                    </div>
                   </div>
                 </td>
                 <td className="dark:text-dark-300 px-4 py-3 text-gray-500">{u.email}</td>

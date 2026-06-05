@@ -52,7 +52,7 @@ public class SetupController(
         await unitOfWork.SaveChangesAsync(ct);
 
         return Ok(Result<UserDto>.Success(
-            new UserDto(user.Id, user.Name, user.Email, "Admin", user.IsActive, null, user.CreatedAt),
+            new UserDto(user.Id, user.Name, user.Nickname, user.Email, "Admin", user.IsActive, null, user.CreatedAt),
             "Admin user created successfully. This endpoint is now disabled."));
     }
 }

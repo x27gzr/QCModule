@@ -30,6 +30,7 @@ public class CreateUserCommandHandler(
         var user = new User
         {
             Name         = request.Name.Trim(),
+            Nickname     = string.IsNullOrWhiteSpace(request.Nickname) ? null : request.Nickname.Trim(),
             Email        = normalizedEmail,
             PasswordHash = passwordHasher.Hash(request.Password),
             RoleId       = request.RoleId,
@@ -40,7 +41,7 @@ public class CreateUserCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result<UserDto>.Success(
-            new UserDto(user.Id, user.Name, user.Email, role.Name, user.IsActive, null, user.CreatedAt),
+            new UserDto(user.Id, user.Name, user.Nickname, user.Email, role.Name, user.IsActive, null, user.CreatedAt),
             "User created successfully.");
     }
 }

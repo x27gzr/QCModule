@@ -7,15 +7,17 @@ import type { UserDto } from "@/services/userService";
 
 const createSchema = z.object({
   name:     z.string().min(1, "Name is required"),
+  nickname: z.string().optional(),
   email:    z.string().min(1, "Email is required").email("Invalid email"),
   password: z.string().min(8, "Min 8 characters").regex(/[A-Z]/, "Need uppercase").regex(/[0-9]/, "Need number"),
   roleId:   z.string().min(1, "Role is required"),
 });
 
 const editSchema = z.object({
-  name:   z.string().min(1, "Name is required"),
-  email:  z.string().min(1, "Email is required").email("Invalid email"),
-  roleId: z.string().min(1, "Role is required"),
+  name:     z.string().min(1, "Name is required"),
+  nickname: z.string().optional(),
+  email:    z.string().min(1, "Email is required").email("Invalid email"),
+  roleId:   z.string().min(1, "Role is required"),
 });
 
 type CreateValues = z.infer<typeof createSchema>;
@@ -38,7 +40,7 @@ export default function UserFormModal({ mode, user, roles, onSave, onClose }: Pr
 
   useEffect(() => {
     if (isEdit && user) {
-      reset({ name: user.name, email: user.email, roleId: roles.find(r => r.name === user.role)?.id ?? "" });
+      reset({ name: user.name, nickname: user.nickname ?? "", email: user.email, roleId: roles.find(r => r.name === user.role)?.id ?? "" });
     }
   }, [user, isEdit, roles, reset]);
 
@@ -66,6 +68,14 @@ export default function UserFormModal({ mode, user, roles, onSave, onClose }: Pr
               className="dark:bg-dark-900 dark:text-dark-100 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50 dark:border-dark-600"
               placeholder="Full name" />
             {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message as string}</p>}
+          </div>
+
+          {/* Nickname */}
+          <div>
+            <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">Nickname <span className="text-gray-400">(optional)</span></label>
+            <input {...register("nickname")}
+              className="dark:bg-dark-900 dark:text-dark-100 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50 dark:border-dark-600"
+              placeholder="Short display name (e.g. for activity log)" />
           </div>
 
           {/* Email */}

@@ -31,15 +31,16 @@ public class UpdateUserCommandHandler(
         var role  = roles.FirstOrDefault()
             ?? throw new NotFoundException("Role", request.RoleId);
 
-        user.Name   = request.Name.Trim();
-        user.Email  = normalizedEmail;
-        user.RoleId = request.RoleId;
+        user.Name     = request.Name.Trim();
+        user.Nickname = string.IsNullOrWhiteSpace(request.Nickname) ? null : request.Nickname.Trim();
+        user.Email    = normalizedEmail;
+        user.RoleId   = request.RoleId;
 
         await userRepo.UpdateAsync(user, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result<UserDto>.Success(
-            new UserDto(user.Id, user.Name, user.Email, role.Name, user.IsActive, user.LastLoginAt, user.CreatedAt),
+            new UserDto(user.Id, user.Name, user.Nickname, user.Email, role.Name, user.IsActive, user.LastLoginAt, user.CreatedAt),
             "User updated successfully.");
     }
 }

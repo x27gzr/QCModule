@@ -23,7 +23,7 @@ public class GetUserByIdQueryHandler(
             ?? throw new NotFoundException("Role", user.RoleId);
 
         return Result<UserDto>.Success(new UserDto(
-            user.Id, user.Name, user.Email, role.Name,
+            user.Id, user.Name, user.Nickname, user.Email, role.Name,
             user.IsActive, user.LastLoginAt, user.CreatedAt));
     }
 }
