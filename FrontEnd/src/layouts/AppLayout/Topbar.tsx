@@ -1,5 +1,6 @@
-import { ArrowRightStartOnRectangleIcon, BellIcon } from "@heroicons/react/24/outline";
+import { ArrowRightStartOnRectangleIcon, BellIcon, SunIcon, MoonIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/contexts/auth/context";
+import { useThemeContext } from "@/contexts/theme/context";
 import { useNavigate } from "react-router-dom";
 import { AUTH_ROUTES } from "@/routes/common/routePaths";
 
@@ -9,12 +10,15 @@ interface TopbarProps {
 
 export function Topbar({ title }: TopbarProps) {
   const { user, logout } = useAuth();
+  const { isDark, setThemeMode } = useThemeContext();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout();
     navigate(AUTH_ROUTES.SIGN_IN, { replace: true });
   };
+
+  const toggleDark = () => setThemeMode(isDark ? "light" : "dark");
 
   return (
     <header className="dark:bg-dark-800 dark:border-dark-600 border-gray-150 flex h-16 items-center justify-between border-b bg-white px-6">
@@ -23,6 +27,15 @@ export function Topbar({ title }: TopbarProps) {
       </h1>
 
       <div className="flex items-center gap-2">
+        {/* Dark mode toggle */}
+        <button
+          onClick={toggleDark}
+          title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+          className="dark:text-dark-300 dark:hover:bg-dark-700 rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100"
+        >
+          {isDark ? <SunIcon className="size-5" /> : <MoonIcon className="size-5" />}
+        </button>
+
         <button className="dark:text-dark-300 dark:hover:bg-dark-700 rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100">
           <BellIcon className="size-5" />
         </button>
