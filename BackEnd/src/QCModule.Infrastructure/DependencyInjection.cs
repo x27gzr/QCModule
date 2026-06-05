@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IJwtService, JwtService>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IWestgardService, WestgardService>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
         return services;

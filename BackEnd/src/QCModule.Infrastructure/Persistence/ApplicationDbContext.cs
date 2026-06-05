@@ -50,6 +50,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
              .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // ── WestgardRules seed ────────────────────────────────────────────────
+        modelBuilder.Entity<WestgardRule>().HasData(
+            new WestgardRule { Id = Guid.Parse("a1000001-0000-0000-0000-000000000001"), RuleCode = "1:2s", Description = "Warning: one value exceeds ±2SD. Investigate but do not reject.",   IsWarning = true,  IsRejection = false, IsEnabled = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+            new WestgardRule { Id = Guid.Parse("a1000001-0000-0000-0000-000000000002"), RuleCode = "1:3s", Description = "Rejection: one value exceeds ±3SD. Random error.",                  IsWarning = false, IsRejection = true,  IsEnabled = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+            new WestgardRule { Id = Guid.Parse("a1000001-0000-0000-0000-000000000003"), RuleCode = "2:2s", Description = "Rejection: two consecutive values exceed the same ±2SD limit.",     IsWarning = false, IsRejection = true,  IsEnabled = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+            new WestgardRule { Id = Guid.Parse("a1000001-0000-0000-0000-000000000004"), RuleCode = "R:4s", Description = "Rejection: range between two values in a run exceeds 4SD.",         IsWarning = false, IsRejection = true,  IsEnabled = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+            new WestgardRule { Id = Guid.Parse("a1000001-0000-0000-0000-000000000005"), RuleCode = "4:1s", Description = "Rejection: four consecutive values exceed the same ±1SD limit.",    IsWarning = false, IsRejection = true,  IsEnabled = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+            new WestgardRule { Id = Guid.Parse("a1000001-0000-0000-0000-000000000006"), RuleCode = "10:x", Description = "Rejection: ten consecutive values fall on the same side of mean.", IsWarning = false, IsRejection = true,  IsEnabled = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false }
+        );
+
         // ── Role ──────────────────────────────────────────────────────────────
         modelBuilder.Entity<Role>(e =>
         {

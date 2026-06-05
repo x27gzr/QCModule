@@ -7,6 +7,7 @@ export const APP_ROUTES = {
   USERS:       "/users",
   INSTRUMENTS: "/instruments",
   QC_SAMPLES:  "/qc-samples",
+  TEST_FILES:  "/test-files",
   QC_RESULTS:  "/qc-results",
   REPORTS:     "/reports",
 };

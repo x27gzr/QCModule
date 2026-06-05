@@ -6,6 +6,8 @@ const Dashboard   = lazy(() => import("@/pages/dashboard"));
 const Users       = lazy(() => import("@/pages/users"));
 const Instruments = lazy(() => import("@/pages/instruments"));
 const QCSamples   = lazy(() => import("@/pages/qc-samples"));
+const TestFiles   = lazy(() => import("@/pages/test-files"));
+const QCResults   = lazy(() => import("@/pages/qc-results"));
 
 export const authRoutes = [
   { path: AUTH_ROUTES.SIGN_IN, element: <SignIn /> },
@@ -16,7 +18,8 @@ export const appRoutes = [
   { path: APP_ROUTES.USERS,       element: <Users /> },
   { path: APP_ROUTES.INSTRUMENTS, element: <Instruments /> },
   { path: APP_ROUTES.QC_SAMPLES,  element: <QCSamples /> },
-  { path: APP_ROUTES.QC_RESULTS,  element: <PlaceholderPage title="QC Results" /> },
+  { path: APP_ROUTES.TEST_FILES,  element: <TestFiles /> },
+  { path: APP_ROUTES.QC_RESULTS,  element: <QCResults /> },
   { path: APP_ROUTES.REPORTS,     element: <PlaceholderPage title="Reports" /> },
 ];
 

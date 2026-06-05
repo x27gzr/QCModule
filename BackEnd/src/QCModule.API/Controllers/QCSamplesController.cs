@@ -6,9 +6,11 @@ using QCModule.Application.Common.Models;
 using QCModule.Application.Features.QCSamples.Commands.CreateQCSample;
 using QCModule.Application.Features.QCSamples.Commands.DeleteQCSample;
 using QCModule.Application.Features.QCSamples.Commands.UpdateQCSample;
+using QCModule.Application.Features.QCSamples.Commands.UpsertTarget;
 using QCModule.Application.Features.QCSamples.DTOs;
 using QCModule.Application.Features.QCSamples.Queries.GetQCSampleById;
 using QCModule.Application.Features.QCSamples.Queries.GetQCSamples;
+using QCModule.Application.Features.QCSamples.Queries.GetQCSampleTargets;
 
 namespace QCModule.API.Controllers;
 
@@ -19,28 +21,18 @@ public class QCSamplesController(IMediator mediator) : ControllerBase
     [HttpGet]
     [Authorize(Policy = Permissions.QCSamples.View)]
     public async Task<ActionResult<Result<PaginatedResult<QCSampleSummaryDto>>>> GetAll(
-        [FromQuery] string? search,
-        [FromQuery] Guid?   instrumentId,
-        [FromQuery] int     page     = 1,
-        [FromQuery] int     pageSize = 10,
-        CancellationToken ct = default)
-    {
-        var result = await mediator.Send(new GetQCSamplesQuery(search, instrumentId, page, pageSize), ct);
-        return Ok(result);
-    }
+        [FromQuery] string? search, [FromQuery] Guid? instrumentId,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
+        => Ok(await mediator.Send(new GetQCSamplesQuery(search, instrumentId, page, pageSize), ct));
 
     [HttpGet("{id:guid}")]
     [Authorize(Policy = Permissions.QCSamples.View)]
     public async Task<ActionResult<Result<QCSampleDto>>> GetById(Guid id, CancellationToken ct)
-    {
-        var result = await mediator.Send(new GetQCSampleByIdQuery(id), ct);
-        return Ok(result);
-    }
+        => Ok(await mediator.Send(new GetQCSampleByIdQuery(id), ct));
 
     [HttpPost]
     [Authorize(Policy = Permissions.QCSamples.Manage)]
-    public async Task<ActionResult<Result<QCSampleDto>>> Create(
-        [FromBody] CreateQCSampleCommand command, CancellationToken ct)
+    public async Task<ActionResult<Result<QCSampleDto>>> Create([FromBody] CreateQCSampleCommand command, CancellationToken ct)
     {
         var result = await mediator.Send(command, ct);
         return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result);
@@ -48,12 +40,8 @@ public class QCSamplesController(IMediator mediator) : ControllerBase
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = Permissions.QCSamples.Manage)]
-    public async Task<ActionResult<Result<QCSampleDto>>> Update(
-        Guid id, [FromBody] UpdateQCSampleCommand command, CancellationToken ct)
-    {
-        var result = await mediator.Send(command with { Id = id }, ct);
-        return Ok(result);
-    }
+    public async Task<ActionResult<Result<QCSampleDto>>> Update(Guid id, [FromBody] UpdateQCSampleCommand command, CancellationToken ct)
+        => Ok(await mediator.Send(command with { Id = id }, ct));
 
     [HttpDelete("{id:guid}")]
     [Authorize(Policy = Permissions.QCSamples.Manage)]
@@ -62,4 +50,18 @@ public class QCSamplesController(IMediator mediator) : ControllerBase
         await mediator.Send(new DeleteQCSampleCommand(id), ct);
         return NoContent();
     }
+
+    // ── Targets ──────────────────────────────────────────────────────────────
+    [HttpGet("{id:guid}/targets")]
+    [Authorize(Policy = Permissions.QCSamples.View)]
+    public async Task<ActionResult<Result<IEnumerable<QCSampleTargetDto>>>> GetTargets(Guid id, CancellationToken ct)
+        => Ok(await mediator.Send(new GetQCSampleTargetsQuery(id), ct));
+
+    [HttpPut("{id:guid}/targets")]
+    [Authorize(Policy = Permissions.QCSamples.Manage)]
+    public async Task<ActionResult<Result<QCSampleTargetDto>>> UpsertTarget(
+        Guid id, [FromBody] UpsertTargetRequest body, CancellationToken ct)
+        => Ok(await mediator.Send(new UpsertTargetCommand(id, body.TestFileParameterId, body.Mean, body.SD, body.CV), ct));
 }
+
+public record UpsertTargetRequest(Guid TestFileParameterId, double Mean, double SD, double CV);

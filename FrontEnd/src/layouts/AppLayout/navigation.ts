@@ -34,6 +34,12 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["Admin", "Supervisor", "Analyst"],
   },
   {
+    label: "Test Files",
+    path: APP_ROUTES.TEST_FILES,
+    iconName: "document",
+    roles: ["Admin", "Supervisor", "Analyst"],
+  },
+  {
     label: "QC Results",
     path: APP_ROUTES.QC_RESULTS,
     iconName: "chart-bar",

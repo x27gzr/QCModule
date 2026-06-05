@@ -6,6 +6,7 @@ import {
   ClipboardDocumentListIcon,
   ChartBarIcon,
   DocumentChartBarIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import {
   HomeIcon as HomeSolid,
@@ -14,6 +15,7 @@ import {
   ClipboardDocumentListIcon as ClipboardSolid,
   ChartBarIcon as ChartSolid,
   DocumentChartBarIcon as DocChartSolid,
+  DocumentTextIcon as DocTextSolid,
 } from "@heroicons/react/24/solid";
 import Logo from "@/assets/appLogo.svg?react";
 import { useAuth } from "@/contexts/auth/context";
@@ -26,6 +28,7 @@ const ICONS: Record<string, { outline: React.ElementType; solid: React.ElementTy
   clipboard:     { outline: ClipboardDocumentListIcon,   solid: ClipboardSolid },
   "chart-bar":   { outline: ChartBarIcon,                solid: ChartSolid },
   "document-chart": { outline: DocumentChartBarIcon,     solid: DocChartSolid },
+  "document":       { outline: DocumentTextIcon,          solid: DocTextSolid },
 };
 
 export function Sidebar() {
