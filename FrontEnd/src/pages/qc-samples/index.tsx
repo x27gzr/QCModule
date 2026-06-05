@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import {
   PlusIcon, MagnifyingGlassIcon, PencilSquareIcon,
   TrashIcon, ArrowPathIcon, ClipboardDocumentListIcon,
-  ExclamationTriangleIcon,
+  ExclamationTriangleIcon, AdjustmentsHorizontalIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import qcSampleService, { type QCSampleSummaryDto, type QCSampleDto } from "@/services/qcSampleService";
 import instrumentService, { type InstrumentSummaryDto } from "@/services/instrumentService";
 import QCSampleFormModal from "./QCSampleFormModal";
+import QCSampleTargetsModal from "./QCSampleTargetsModal";
 import DeleteModal from "@/pages/users/DeleteModal";
 import { useAuth } from "@/contexts/auth/context";
 
@@ -38,9 +39,10 @@ export default function QCSamplesPage() {
   const [filterInstr, setFilterInstr] = useState("");
   const [loading,     setLoading]     = useState(true);
 
-  const [modal,  setModal]  = useState<"create" | "edit" | "delete" | null>(null);
-  const [target, setTarget] = useState<QCSampleSummaryDto | null>(null);
-  const [detail, setDetail] = useState<QCSampleDto | null>(null);
+  const [modal,         setModal]         = useState<"create" | "edit" | "delete" | null>(null);
+  const [target,        setTarget]        = useState<QCSampleSummaryDto | null>(null);
+  const [detail,        setDetail]        = useState<QCSampleDto | null>(null);
+  const [targetsSample, setTargetsSample] = useState<QCSampleSummaryDto | null>(null);
 
   const pageSize = 10;
 
@@ -50,14 +52,11 @@ export default function QCSamplesPage() {
       const res = await qcSampleService.getAll({
         search: search || undefined,
         instrumentId: filterInstr || undefined,
-        page,
-        pageSize,
+        page, pageSize,
       });
       setItems(res.data.data.items);
       setTotal(res.data.data.totalCount);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [search, filterInstr, page]);
 
   useEffect(() => { load(); }, [load]);
@@ -69,9 +68,7 @@ export default function QCSamplesPage() {
 
   const openEdit = async (item: QCSampleSummaryDto) => {
     const res = await qcSampleService.getById(item.id);
-    setDetail(res.data.data);
-    setTarget(item);
-    setModal("edit");
+    setDetail(res.data.data); setTarget(item); setModal("edit");
   };
 
   const handleCreate = async (data: any) => { await qcSampleService.create(data); load(); };
@@ -120,7 +117,7 @@ export default function QCSamplesPage() {
               <th className="px-4 py-3">Level</th>
               <th className="px-4 py-3">Instrument</th>
               <th className="px-4 py-3">Expiry Date</th>
-              {canManage && <th className="px-4 py-3 text-right">Actions</th>}
+              <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-dark-600">
@@ -155,20 +152,30 @@ export default function QCSamplesPage() {
                 </td>
                 <td className="dark:text-dark-300 px-4 py-3 text-gray-500">{item.instrumentName}</td>
                 <td className="px-4 py-3"><ExpiryBadge item={item} /></td>
-                {canManage && (
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => openEdit(item)}
-                        className="dark:text-dark-300 dark:hover:bg-dark-600 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100" title="Edit">
-                        <PencilSquareIcon className="size-4" />
-                      </button>
-                      <button onClick={() => { setTarget(item); setModal("delete"); }}
-                        className="dark:hover:bg-dark-600 rounded-lg p-1.5 hover:bg-gray-100" title="Delete">
-                        <TrashIcon className="size-4 text-red-500" />
-                      </button>
-                    </div>
-                  </td>
-                )}
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-1">
+                    {/* Targets button — visible to all roles */}
+                    <button
+                      onClick={() => setTargetsSample(item)}
+                      title="Manage Targets (Mean/SD/CV)"
+                      className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+                      <AdjustmentsHorizontalIcon className="size-4" />
+                      Targets
+                    </button>
+                    {canManage && (
+                      <>
+                        <button onClick={() => openEdit(item)}
+                          className="dark:text-dark-300 dark:hover:bg-dark-600 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100" title="Edit">
+                          <PencilSquareIcon className="size-4" />
+                        </button>
+                        <button onClick={() => { setTarget(item); setModal("delete"); }}
+                          className="dark:hover:bg-dark-600 rounded-lg p-1.5 hover:bg-gray-100" title="Delete">
+                          <TrashIcon className="size-4 text-red-500" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -188,6 +195,7 @@ export default function QCSamplesPage() {
         )}
       </div>
 
+      {/* Modals */}
       {modal === "create" && (
         <QCSampleFormModal mode="create" instruments={instruments} onSave={handleCreate} onClose={() => setModal(null)} />
       )}
@@ -196,6 +204,13 @@ export default function QCSamplesPage() {
       )}
       {modal === "delete" && target && (
         <DeleteModal name={target.name} onConfirm={handleDelete} onClose={() => setModal(null)} />
+      )}
+      {targetsSample && (
+        <QCSampleTargetsModal
+          qcSampleId={targetsSample.id}
+          sampleName={`${targetsSample.name} — ${targetsSample.level}`}
+          onClose={() => setTargetsSample(null)}
+        />
       )}
     </div>
   );
