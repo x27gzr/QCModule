@@ -97,7 +97,38 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                     IsSystem    = true,
                     CreatedAt   = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                     IsDeleted   = false
+                },
+                new Role
+                {
+                    Id          = Guid.Parse("c4c8e2a9-1d6b-4f3e-9a7c-2b5d8e0f1a3c"),
+                    Name        = "Doctor",
+                    Description = "Authorises validated QC results (second approval layer).",
+                    IsSystem    = true,
+                    CreatedAt   = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    IsDeleted   = false
                 });
+        });
+
+        // ── QCResult approval relationships (3 FKs to User) ───────────────────
+        modelBuilder.Entity<QCResult>(e =>
+        {
+            // Entry author — keep the existing User.QCResults inverse collection
+            e.HasOne(r => r.User)
+             .WithMany(u => u.QCResults)
+             .HasForeignKey(r => r.UserId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            // Analyst validator (no inverse collection)
+            e.HasOne(r => r.ValidatedByUser)
+             .WithMany()
+             .HasForeignKey(r => r.ValidatedBy)
+             .OnDelete(DeleteBehavior.NoAction);
+
+            // Doctor authoriser (no inverse collection)
+            e.HasOne(r => r.AuthorisedByUser)
+             .WithMany()
+             .HasForeignKey(r => r.AuthorisedBy)
+             .OnDelete(DeleteBehavior.NoAction);
         });
     }
 

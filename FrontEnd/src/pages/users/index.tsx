@@ -13,6 +13,7 @@ const ROLE_COLORS: Record<string, string> = {
   Admin:      "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
   Supervisor: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   Analyst:    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  Doctor:     "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
 };
 
 export default function UsersPage() {

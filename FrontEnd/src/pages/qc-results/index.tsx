@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { PlusIcon, MagnifyingGlassIcon, ArrowPathIcon, ChartBarIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, ArrowPathIcon, ChartBarIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, ClockIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import dayjs from "dayjs";
-import qcResultService, { type QCResultSummaryDto, type QCStatus } from "@/services/qcResultService";
+import qcResultService, { type QCResultSummaryDto, type QCStatus, type ValidationStatus, type AuthorisationStatus } from "@/services/qcResultService";
 import qcSampleService, { type QCSampleSummaryDto } from "@/services/qcSampleService";
 import testFileService, { type TestFileDto } from "@/services/testFileService";
 import { useAuth } from "@/contexts/auth/context";
 
-// ── Status display helpers ────────────────────────────────────────────────────
+// ── Westgard status ───────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<QCStatus, { label: string; icon: React.ElementType; color: string }> = {
   Pending:  { label: "Pending",  icon: ClockIcon,               color: "text-gray-400 dark:text-dark-400" },
   Accepted: { label: "Accepted", icon: CheckCircleIcon,         color: "text-emerald-600" },
@@ -18,9 +18,27 @@ const STATUS_CONFIG: Record<QCStatus, { label: string; icon: React.ElementType; 
 };
 
 function StatusBadge({ status }: { status: QCStatus }) {
-  const cfg = STATUS_CONFIG[status];
-  const Icon = cfg.icon;
+  const cfg = STATUS_CONFIG[status]; const Icon = cfg.icon;
   return <span className={`flex items-center gap-1 text-xs font-medium ${cfg.color}`}><Icon className="size-3.5" />{cfg.label}</span>;
+}
+
+function ValidationBadge({ status, by }: { status: ValidationStatus; by: string | null }) {
+  const map: Record<ValidationStatus, string> = {
+    Pending:   "bg-gray-100 text-gray-500 dark:bg-dark-600 dark:text-dark-300",
+    Validated: "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
+    Rejected:  "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400",
+  };
+  return (
+    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${map[status]}`} title={by ? `by ${by}` : undefined}>
+      {status}
+    </span>
+  );
+}
+
+function AuthBadge({ status }: { status: AuthorisationStatus }) {
+  if (status === "Authorised")
+    return <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"><ShieldCheckIcon className="size-3" />Authorised</span>;
+  return <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-400 dark:bg-dark-600 dark:text-dark-400">—</span>;
 }
 
 function ZScoreBadge({ z }: { z: number }) {
@@ -30,6 +48,8 @@ function ZScoreBadge({ z }: { z: number }) {
               : "bg-gray-100 text-gray-600 dark:bg-dark-600 dark:text-dark-300";
   return <span className={`rounded px-1.5 py-0.5 font-mono text-xs font-medium ${color}`}>{z > 0 ? "+" : ""}{z.toFixed(2)}</span>;
 }
+
+const inputCls = "dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50";
 
 // ── Entry modal ───────────────────────────────────────────────────────────────
 const entrySchema = z.object({
@@ -41,15 +61,12 @@ const entrySchema = z.object({
 });
 type EntryForm = z.infer<typeof entrySchema>;
 
-const inputCls = "dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50";
-
 function EntryModal({ onSave, onClose }: { onSave: (data: EntryForm) => Promise<string>; onClose: () => void }) {
   const [samples, setSamples]     = useState<QCSampleSummaryDto[]>([]);
   const [testFiles, setTestFiles] = useState<TestFileDto[]>([]);
   const [savedMsg, setSavedMsg]   = useState<string | null>(null);
-  const [selectedSample, setSelectedSample] = useState("");
 
-  const { register, handleSubmit, watch, setError, formState: { errors, isSubmitting } } = useForm<EntryForm>({
+  const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<EntryForm>({
     resolver: zodResolver(entrySchema),
     defaultValues: { resultDate: dayjs().format("YYYY-MM-DDTHH:mm") },
   });
@@ -57,11 +74,9 @@ function EntryModal({ onSave, onClose }: { onSave: (data: EntryForm) => Promise<
   useEffect(() => {
     qcSampleService.getAll({ pageSize: 100 }).then(r => setSamples(r.data.data.items));
     testFileService.getAll({ isActive: true, pageSize: 100 }).then(r =>
-      Promise.all(r.data.data.items.map(tf => testFileService.getById(tf.id).then(x => x.data.data)))
-        .then(setTestFiles));
+      Promise.all(r.data.data.items.map(tf => testFileService.getById(tf.id).then(x => x.data.data))).then(setTestFiles));
   }, []);
 
-  const watchedSample = watch("qcSampleId");
   const availableParams = testFiles.flatMap(tf =>
     tf.parameters.map(p => ({ id: p.id, label: `${p.parameterName}${p.unit ? ` (${p.unit})` : ""}`, testFile: tf.name })));
 
@@ -90,7 +105,7 @@ function EntryModal({ onSave, onClose }: { onSave: (data: EntryForm) => Promise<
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">QC Sample *</label>
-            <select {...register("qcSampleId")} className={inputCls} onChange={e => setSelectedSample(e.target.value)}>
+            <select {...register("qcSampleId")} className={inputCls}>
               <option value="">Select QC sample…</option>
               {samples.map(s => <option key={s.id} value={s.id}>{s.name} — {s.level} (Lot: {s.lotNumber})</option>)}
             </select>
@@ -131,30 +146,34 @@ function EntryModal({ onSave, onClose }: { onSave: (data: EntryForm) => Promise<
   );
 }
 
-// ── Review modal ──────────────────────────────────────────────────────────────
-function ReviewModal({ result, onSave, onClose }: { result: QCResultSummaryDto; onSave: (status: number, comment?: string) => Promise<void>; onClose: () => void }) {
-  const [comment, setComment] = useState("");
+// ── Analyst validation modal ──────────────────────────────────────────────────
+function ValidateModal({ result, onValidate, onClose }: {
+  result: QCResultSummaryDto;
+  onValidate: (reject: boolean, note?: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
-  const handle = async (status: number) => {
+  const handle = async (reject: boolean) => {
     setLoading(true);
-    try { await onSave(status, comment || undefined); onClose(); }
+    try { await onValidate(reject, note || undefined); onClose(); }
     finally { setLoading(false); }
   };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="dark:bg-dark-800 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-        <h2 className="dark:text-dark-100 mb-2 text-lg font-semibold">Review Result</h2>
+        <h2 className="dark:text-dark-100 mb-2 text-lg font-semibold">Analyst Validation</h2>
         <div className="dark:bg-dark-700 mb-4 rounded-lg bg-gray-50 p-3 text-sm">
           <p className="dark:text-dark-200 font-medium text-gray-800">{result.qcSampleName} — {result.parameterName}</p>
-          <p className="dark:text-dark-400 text-gray-500">Value: {result.value} · Z-score: {result.zScore.toFixed(3)} · Flags: {result.westgardFlags || "None"}</p>
+          <p className="dark:text-dark-400 text-gray-500">Value: {result.value} · Z-score: {result.zScore.toFixed(3)} · Westgard: {result.status}{result.westgardFlags ? ` (${result.westgardFlags})` : ""}</p>
         </div>
-        <textarea value={comment} onChange={e => setComment(e.target.value)}
+        <textarea value={note} onChange={e => setNote(e.target.value)}
           className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 mb-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-          rows={2} placeholder="Review comment (optional)" />
+          rows={2} placeholder="Note (optional)" />
         <div className="flex gap-3">
           <button onClick={onClose} className="dark:text-dark-300 flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 dark:border-dark-600 hover:bg-gray-50 dark:hover:bg-dark-700">Cancel</button>
-          <button onClick={() => handle(3)} disabled={loading} className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">Reject</button>
-          <button onClick={() => handle(1)} disabled={loading} className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60">Accept</button>
+          <button onClick={() => handle(true)} disabled={loading} className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">Reject</button>
+          <button onClick={() => handle(false)} disabled={loading} className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">Validate</button>
         </div>
       </div>
     </div>
@@ -164,25 +183,25 @@ function ReviewModal({ result, onSave, onClose }: { result: QCResultSummaryDto; 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function QCResultsPage() {
   const { user: me } = useAuth();
-  const canReview = me?.role === "Admin" || me?.role === "Supervisor";
+  const canValidate = me?.role === "Admin" || me?.role === "Supervisor" || me?.role === "Analyst";
 
   const [results, setResults] = useState<QCResultSummaryDto[]>([]);
   const [total,   setTotal]   = useState(0);
   const [page,    setPage]    = useState(1);
-  const [status,  setStatus]  = useState<QCStatus | "">("");
+  const [valFilter, setValFilter] = useState<ValidationStatus | "">("");
   const [loading, setLoading] = useState(true);
   const [showEntry,  setShowEntry]  = useState(false);
-  const [reviewing,  setReviewing]  = useState<QCResultSummaryDto | null>(null);
+  const [validating, setValidating] = useState<QCResultSummaryDto | null>(null);
 
   const pageSize = 20;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await qcResultService.getAll({ status: status || undefined, page, pageSize });
+      const res = await qcResultService.getAll({ validationStatus: valFilter || undefined, page, pageSize });
       setResults(res.data.data.items); setTotal(res.data.data.totalCount);
     } finally { setLoading(false); }
-  }, [status, page]);
+  }, [valFilter, page]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -192,8 +211,15 @@ export default function QCResultsPage() {
     return res.data.message ?? "Result saved.";
   };
 
-  const handleReview = async (status: number, comment?: string) => {
-    await qcResultService.review(reviewing!.id, { newStatus: status, comment });
+  const handleValidate = async (reject: boolean, note?: string) => {
+    await qcResultService.validate(validating!.id, { reject, note });
+    load();
+  };
+
+  const handleCancelValidation = async (r: QCResultSummaryDto) => {
+    const reason = window.prompt("Reason for cancelling validation:");
+    if (!reason) return;
+    await qcResultService.cancelValidation(r.id, reason);
     load();
   };
 
@@ -203,16 +229,13 @@ export default function QCResultsPage() {
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <select value={status} onChange={e => { setStatus(e.target.value as any); setPage(1); }}
-            className="dark:bg-dark-800 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none">
-            <option value="">All Status</option>
-            <option value="Pending">Pending</option>
-            <option value="Accepted">Accepted</option>
-            <option value="Warning">Warning</option>
-            <option value="Rejected">Rejected</option>
-          </select>
-        </div>
+        <select value={valFilter} onChange={e => { setValFilter(e.target.value as any); setPage(1); }}
+          className="dark:bg-dark-800 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none">
+          <option value="">All Validation</option>
+          <option value="Pending">Pending Validation</option>
+          <option value="Validated">Validated</option>
+          <option value="Rejected">Rejected</option>
+        </select>
         <div className="flex gap-2">
           <button onClick={load} className="dark:text-dark-300 dark:hover:bg-dark-700 rounded-lg p-2 text-gray-500 hover:bg-gray-100"><ArrowPathIcon className="size-4" /></button>
           <button onClick={() => setShowEntry(true)} className="bg-primary-600 hover:bg-primary-700 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"><PlusIcon className="size-4" />Enter Result</button>
@@ -220,17 +243,17 @@ export default function QCResultsPage() {
       </div>
 
       {/* Table */}
-      <div className="dark:bg-dark-800 dark:border-dark-600 border-gray-150 overflow-hidden rounded-xl border bg-white shadow-xs">
+      <div className="dark:bg-dark-800 dark:border-dark-600 border-gray-150 overflow-x-auto rounded-xl border bg-white shadow-xs">
         <table className="w-full text-sm">
           <thead>
             <tr className="dark:bg-dark-700 dark:text-dark-300 border-gray-150 dark:border-dark-600 border-b bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
               <th className="px-4 py-3">Sample / Parameter</th>
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Value</th>
-              <th className="px-4 py-3">Z-Score</th>
-              <th className="px-4 py-3">Flags</th>
-              <th className="px-4 py-3">Status</th>
-              {canReview && <th className="px-4 py-3 text-right">Action</th>}
+              <th className="px-4 py-3">Westgard</th>
+              <th className="px-4 py-3">Validation</th>
+              <th className="px-4 py-3">Authorisation</th>
+              {canValidate && <th className="px-4 py-3 text-right">Action</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-dark-600">
@@ -251,14 +274,24 @@ export default function QCResultsPage() {
                   <p className="text-xs text-gray-400 dark:text-dark-400">{r.qcSampleName} · {r.level}</p>
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-500 dark:text-dark-400">{dayjs(r.resultDate).format("DD MMM YYYY HH:mm")}</td>
-                <td className="px-4 py-3 font-mono text-sm font-medium text-gray-800 dark:text-dark-100">{r.value}</td>
-                <td className="px-4 py-3">{r.zScore !== 0 ? <ZScoreBadge z={r.zScore} /> : <span className="text-xs text-gray-300 dark:text-dark-500">—</span>}</td>
-                <td className="px-4 py-3">{r.westgardFlags ? <span className="rounded bg-red-100 px-1.5 py-0.5 font-mono text-xs text-red-700 dark:bg-red-900/20 dark:text-red-400">{r.westgardFlags}</span> : <span className="text-xs text-gray-300 dark:text-dark-500">—</span>}</td>
-                <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
-                {canReview && (
+                <td className="px-4 py-3">
+                  <span className="font-mono text-sm font-medium text-gray-800 dark:text-dark-100">{r.value}</span>
+                  {r.zScore !== 0 && <span className="ml-2"><ZScoreBadge z={r.zScore} /></span>}
+                </td>
+                <td className="px-4 py-3">
+                  <StatusBadge status={r.status} />
+                  {r.westgardFlags && <span className="ml-1 rounded bg-red-100 px-1 py-0.5 font-mono text-[10px] text-red-700 dark:bg-red-900/20 dark:text-red-400">{r.westgardFlags}</span>}
+                </td>
+                <td className="px-4 py-3"><ValidationBadge status={r.validationStatus} by={r.validatedByName} /></td>
+                <td className="px-4 py-3"><AuthBadge status={r.authorisationStatus} /></td>
+                {canValidate && (
                   <td className="px-4 py-3 text-right">
-                    {(r.status === "Pending" || r.status === "Warning") && (
-                      <button onClick={() => setReviewing(r)} className="rounded-lg px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20">Review</button>
+                    {r.validationStatus === "Pending" ? (
+                      <button onClick={() => setValidating(r)} className="rounded-lg px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20">Validate</button>
+                    ) : r.authorisationStatus !== "Authorised" ? (
+                      <button onClick={() => handleCancelValidation(r)} className="rounded-lg px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-600">Cancel</button>
+                    ) : (
+                      <span className="text-xs text-gray-300 dark:text-dark-500">Locked</span>
                     )}
                   </td>
                 )}
@@ -280,7 +313,7 @@ export default function QCResultsPage() {
       </div>
 
       {showEntry  && <EntryModal onSave={handleEntry} onClose={() => { setShowEntry(false); load(); }} />}
-      {reviewing  && <ReviewModal result={reviewing} onSave={handleReview} onClose={() => setReviewing(null)} />}
+      {validating && <ValidateModal result={validating} onValidate={handleValidate} onClose={() => setValidating(null)} />}
     </div>
   );
 }

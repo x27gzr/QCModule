@@ -2,6 +2,8 @@ import api from "@/utils/axios";
 import type { PaginatedResult } from "./instrumentService";
 
 export type QCStatus = "Pending" | "Accepted" | "Warning" | "Rejected";
+export type ValidationStatus = "Pending" | "Validated" | "Rejected";
+export type AuthorisationStatus = "Pending" | "Authorised" | "Rejected";
 
 export interface QCResultSummaryDto {
   id: string;
@@ -14,6 +16,22 @@ export interface QCResultSummaryDto {
   zScore: number;
   status: QCStatus;
   westgardFlags: string | null;
+  validationStatus: ValidationStatus;
+  validatedByName: string | null;
+  validatedAt: string | null;
+  authorisationStatus: AuthorisationStatus;
+  authorisedByName: string | null;
+  authorisedAt: string | null;
+}
+
+export interface AuthorisationSummaryDto {
+  total: number;
+  authorised: number;
+  pending: number;
+  percentage: number;
+  lastAuthoriserName: string | null;
+  lastAuthorisedAt: string | null;
+  lastParameterName: string | null;
 }
 
 export interface QCResultDto extends QCResultSummaryDto {
@@ -72,6 +90,8 @@ const qcResultService = {
     qcSampleId?: string;
     testFileParameterId?: string;
     status?: QCStatus;
+    validationStatus?: ValidationStatus;
+    authorisationStatus?: AuthorisationStatus;
     dateFrom?: string;
     dateTo?: string;
     page?: number;
@@ -86,8 +106,29 @@ const qcResultService = {
     comment?: string;
   }) => api.post<{ data: QCResultDto; message: string }>("/api/qcresults", payload),
 
-  review: (id: string, payload: { newStatus: number; comment?: string }) =>
-    api.patch(`/api/qcresults/${id}/review`, payload),
+  // Stage 1 — analyst
+  validate: (id: string, payload: { reject: boolean; note?: string }) =>
+    api.post(`/api/qcresults/${id}/validate`, payload),
+
+  cancelValidation: (id: string, reason: string) =>
+    api.post(`/api/qcresults/${id}/cancel-validation`, { reason }),
+
+  // Stage 2 — doctor
+  doctorAuthorise: (id: string, note?: string) =>
+    api.post(`/api/qcresults/${id}/doctor-authorise`, { note }),
+
+  doctorCancelAuthorisation: (id: string, reason: string) =>
+    api.post(`/api/qcresults/${id}/doctor-cancel-authorisation`, { reason }),
+
+  batchAuthorise: (resultIds: string[], note?: string) =>
+    api.post<{ data: { authorisedCount: number; failedIds: string[] }; message: string }>(
+      "/api/qcresults/batch-doctor-authorise", { resultIds, note }),
+
+  getPendingAuthorisation: (params?: { qcSampleId?: string; dateFrom?: string; dateTo?: string; page?: number; pageSize?: number }) =>
+    api.get<{ data: PaginatedResult<QCResultSummaryDto> }>("/api/qcresults/pending-doctor-authorisation", { params }),
+
+  getAuthorisationSummary: (params?: { dateFrom?: string; dateTo?: string }) =>
+    api.get<{ data: AuthorisationSummaryDto }>("/api/qcresults/doctor-authorisation-summary", { params }),
 
   getTargets: (qcSampleId: string) =>
     api.get<{ data: QCSampleTargetDto[] }>(`/api/qcsamples/${qcSampleId}/targets`),

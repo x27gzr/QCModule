@@ -13,7 +13,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Dashboard",
     path: APP_ROUTES.DASHBOARD,
     iconName: "home",
-    roles: ["Admin", "Supervisor", "Analyst"],
+    roles: ["Admin", "Supervisor", "Analyst", "Doctor"],
   },
   {
     label: "Users",
@@ -46,10 +46,16 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["Admin", "Supervisor", "Analyst"],
   },
   {
+    label: "Doctor Authorisation",
+    path: APP_ROUTES.DOCTOR_AUTH,
+    iconName: "shield",
+    roles: ["Admin", "Doctor"],
+  },
+  {
     label: "Reports",
     path: APP_ROUTES.REPORTS,
     iconName: "document-chart",
-    roles: ["Admin", "Supervisor"],
+    roles: ["Admin", "Supervisor", "Doctor"],
   },
 ];
 

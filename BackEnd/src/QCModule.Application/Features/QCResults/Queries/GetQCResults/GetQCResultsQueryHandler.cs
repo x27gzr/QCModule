@@ -9,7 +9,8 @@ namespace QCModule.Application.Features.QCResults.Queries.GetQCResults;
 public class GetQCResultsQueryHandler(
     IRepository<QCResult>          resultRepo,
     IRepository<QCSample>          sampleRepo,
-    IRepository<TestFileParameter> paramRepo)
+    IRepository<TestFileParameter> paramRepo,
+    IRepository<User>              userRepo)
     : IRequestHandler<GetQCResultsQuery, Result<PaginatedResult<QCResultSummaryDto>>>
 {
     public async Task<Result<PaginatedResult<QCResultSummaryDto>>> Handle(
@@ -18,15 +19,19 @@ public class GetQCResultsQueryHandler(
         var results = await resultRepo.GetAllAsync(cancellationToken);
         var samples = await sampleRepo.GetAllAsync(cancellationToken);
         var params_ = await paramRepo.GetAllAsync(cancellationToken);
+        var users   = await userRepo.GetAllAsync(cancellationToken);
 
         var sampleMap = samples.ToDictionary(s => s.Id);
         var paramMap  = params_.ToDictionary(p => p.Id);
+        var userMap   = users.ToDictionary(u => u.Id, u => u.Name);
 
         var query = results.AsEnumerable();
 
         if (request.QCSampleId.HasValue)          query = query.Where(r => r.QCSampleId == request.QCSampleId.Value);
         if (request.TestFileParameterId.HasValue)  query = query.Where(r => r.TestFileParameterId == request.TestFileParameterId.Value);
         if (request.Status.HasValue)               query = query.Where(r => r.Status == request.Status.Value);
+        if (request.ValidationStatus.HasValue)     query = query.Where(r => r.ValidationStatus == request.ValidationStatus.Value);
+        if (request.AuthorisationStatus.HasValue)  query = query.Where(r => r.AuthorisationStatus == request.AuthorisationStatus.Value);
         if (request.DateFrom.HasValue)             query = query.Where(r => r.ResultDate >= request.DateFrom.Value);
         if (request.DateTo.HasValue)               query = query.Where(r => r.ResultDate <= request.DateTo.Value);
 
@@ -44,7 +49,13 @@ public class GetQCResultsQueryHandler(
                 return new QCResultSummaryDto(
                     r.Id, s?.Name ?? "?", s?.Level ?? "?",
                     p?.ParameterName ?? "?", p?.Unit,
-                    r.ResultDate, r.Value, r.ZScore, r.Status, r.WestgardFlags);
+                    r.ResultDate, r.Value, r.ZScore, r.Status, r.WestgardFlags,
+                    r.ValidationStatus,
+                    r.ValidatedBy.HasValue  ? userMap.GetValueOrDefault(r.ValidatedBy.Value)  : null,
+                    r.ValidatedAt,
+                    r.AuthorisationStatus,
+                    r.AuthorisedBy.HasValue ? userMap.GetValueOrDefault(r.AuthorisedBy.Value) : null,
+                    r.AuthorisedAt);
             }).ToList();
 
         return Result<PaginatedResult<QCResultSummaryDto>>.Success(new PaginatedResult<QCResultSummaryDto>

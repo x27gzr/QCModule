@@ -20,14 +20,30 @@ public record QCResultDto(
 );
 
 public record QCResultSummaryDto(
-    Guid      Id,
-    string    QCSampleName,
-    string    Level,
-    string    ParameterName,
-    string?   Unit,
-    DateTime  ResultDate,
-    double    Value,
-    double    ZScore,
-    QCStatus  Status,
-    string?   WestgardFlags
+    Guid                Id,
+    string              QCSampleName,
+    string              Level,
+    string              ParameterName,
+    string?             Unit,
+    DateTime            ResultDate,
+    double              Value,
+    double              ZScore,
+    QCStatus            Status,
+    string?             WestgardFlags,
+    ValidationStatus    ValidationStatus,
+    string?             ValidatedByName,
+    DateTime?           ValidatedAt,
+    AuthorisationStatus AuthorisationStatus,
+    string?             AuthorisedByName,
+    DateTime?           AuthorisedAt
+);
+
+public record AuthorisationSummaryDto(
+    int       Total,
+    int       Authorised,
+    int       Pending,
+    double    Percentage,
+    string?   LastAuthoriserName,
+    DateTime? LastAuthorisedAt,
+    string?   LastParameterName
 );

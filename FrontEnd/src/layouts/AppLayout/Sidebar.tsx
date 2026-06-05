@@ -7,6 +7,7 @@ import {
   ChartBarIcon,
   DocumentChartBarIcon,
   DocumentTextIcon,
+  ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import {
   HomeIcon as HomeSolid,
@@ -16,6 +17,7 @@ import {
   ChartBarIcon as ChartSolid,
   DocumentChartBarIcon as DocChartSolid,
   DocumentTextIcon as DocTextSolid,
+  ShieldCheckIcon as ShieldSolid,
 } from "@heroicons/react/24/solid";
 import Logo from "@/assets/appLogo.svg?react";
 import { useAuth } from "@/contexts/auth/context";
@@ -28,6 +30,7 @@ const ICONS: Record<string, { outline: React.ElementType; solid: React.ElementTy
   clipboard:     { outline: ClipboardDocumentListIcon,   solid: ClipboardSolid },
   "chart-bar":   { outline: ChartBarIcon,                solid: ChartSolid },
   "document-chart": { outline: DocumentChartBarIcon,     solid: DocChartSolid },
+  "shield":         { outline: ShieldCheckIcon,           solid: ShieldSolid },
   "document":       { outline: DocumentTextIcon,          solid: DocTextSolid },
 };
 
