@@ -16,6 +16,9 @@ public static class DependencyInjection
 
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
 
+        // Order matters: ActivityLog is outermost so it only records after
+        // validation + handler both succeed.
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ActivityLogBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
         return services;

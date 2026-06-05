@@ -35,6 +35,11 @@ public static class Permissions
         public const string Export = "Permissions.Reports.Export";
     }
 
+    public static class ActivityLogs
+    {
+        public const string View = "Permissions.ActivityLogs.View";
+    }
+
     // Defines which roles hold which permissions.
     // Policies are auto-registered from this map at startup — see ServiceExtensions.
     public static readonly IReadOnlyDictionary<string, string[]> RolePermissions =
@@ -46,7 +51,8 @@ public static class Permissions
                 Instruments.View, Instruments.Manage,
                 QCSamples.View,   QCSamples.Manage,
                 QCResults.View,   QCResults.Create, QCResults.Validate, QCResults.Authorise, QCResults.Delete,
-                Reports.View,  Reports.Export
+                Reports.View,  Reports.Export,
+                ActivityLogs.View
             ],
             ["Supervisor"] =
             [

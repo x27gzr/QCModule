@@ -11,4 +11,5 @@ export const APP_ROUTES = {
   QC_RESULTS:  "/qc-results",
   DOCTOR_AUTH: "/doctor-authorisation",
   REPORTS:     "/reports",
+  ACTIVITY_LOGS: "/activity-logs",
 };

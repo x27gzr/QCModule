@@ -5,7 +5,8 @@ namespace QCModule.API.Middleware;
 
 public class CurrentUserService(IHttpContextAccessor httpContextAccessor) : ICurrentUserService
 {
-    private readonly ClaimsPrincipal? _user = httpContextAccessor.HttpContext?.User;
+    private readonly HttpContext?    _httpContext = httpContextAccessor.HttpContext;
+    private readonly ClaimsPrincipal? _user        = httpContextAccessor.HttpContext?.User;
 
     public Guid? UserId
     {
@@ -21,6 +22,8 @@ public class CurrentUserService(IHttpContextAccessor httpContextAccessor) : ICur
                                       ?? _user?.FindFirstValue("email");
 
     public string? Role            => _user?.FindFirstValue(ClaimTypes.Role);
+
+    public string? IpAddress       => _httpContext?.Connection.RemoteIpAddress?.ToString();
 
     public bool    IsAuthenticated => _user?.Identity?.IsAuthenticated ?? false;
 }

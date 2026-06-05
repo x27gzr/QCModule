@@ -8,6 +8,7 @@ import {
   DocumentChartBarIcon,
   DocumentTextIcon,
   ShieldCheckIcon,
+  ListBulletIcon,
 } from "@heroicons/react/24/outline";
 import {
   HomeIcon as HomeSolid,
@@ -18,6 +19,7 @@ import {
   DocumentChartBarIcon as DocChartSolid,
   DocumentTextIcon as DocTextSolid,
   ShieldCheckIcon as ShieldSolid,
+  ListBulletIcon as ListSolid,
 } from "@heroicons/react/24/solid";
 import Logo from "@/assets/appLogo.svg?react";
 import { useAuth } from "@/contexts/auth/context";
@@ -32,6 +34,7 @@ const ICONS: Record<string, { outline: React.ElementType; solid: React.ElementTy
   "document-chart": { outline: DocumentChartBarIcon,     solid: DocChartSolid },
   "shield":         { outline: ShieldCheckIcon,           solid: ShieldSolid },
   "document":       { outline: DocumentTextIcon,          solid: DocTextSolid },
+  "list":           { outline: ListBulletIcon,             solid: ListSolid },
 };
 
 export function Sidebar() {

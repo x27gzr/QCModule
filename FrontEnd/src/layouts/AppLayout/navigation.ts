@@ -57,6 +57,12 @@ export const NAV_ITEMS: NavItem[] = [
     iconName: "document-chart",
     roles: ["Admin", "Supervisor", "Doctor"],
   },
+  {
+    label: "Activity Logs",
+    path: APP_ROUTES.ACTIVITY_LOGS,
+    iconName: "list",
+    roles: ["Admin"],
+  },
 ];
 
 export const getNavForRole = (role: UserRole): NavItem[] =>
