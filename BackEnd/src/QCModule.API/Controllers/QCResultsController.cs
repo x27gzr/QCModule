@@ -7,6 +7,7 @@ using QCModule.Application.Features.QCResults.Commands.CreateQCResult;
 using QCModule.Application.Features.QCResults.Commands.ReviewQCResult;
 using QCModule.Application.Features.QCResults.DTOs;
 using QCModule.Application.Features.QCResults.Queries.GetQCResults;
+using QCModule.Application.Features.QCResults.Queries.GetLeveyJennings;
 using QCModule.Domain.Enums;
 
 namespace QCModule.API.Controllers;
@@ -40,6 +41,17 @@ public class QCResultsController(IMediator mediator) : ControllerBase
     public async Task<ActionResult<Result<bool>>> Review(
         Guid id, [FromBody] ReviewRequest body, CancellationToken ct)
         => Ok(await mediator.Send(new ReviewQCResultCommand(id, body.NewStatus, body.Comment), ct));
+
+    [HttpGet("levey-jennings")]
+    [Authorize(Policy = Permissions.Reports.View)]
+    public async Task<ActionResult<Result<LeveyJenningsDto>>> LeveyJennings(
+        [FromQuery] Guid      qcSampleId,
+        [FromQuery] Guid      testFileParameterId,
+        [FromQuery] DateTime? dateFrom,
+        [FromQuery] DateTime? dateTo,
+        CancellationToken ct = default)
+        => Ok(await mediator.Send(
+            new GetLeveyJenningsQuery(qcSampleId, testFileParameterId, dateFrom, dateTo), ct));
 }
 
 public record ReviewRequest(QCStatus NewStatus, string? Comment);

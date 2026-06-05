@@ -34,6 +34,39 @@ export interface QCSampleTargetDto {
   cv: number;
 }
 
+export interface LeveyJenningsPoint {
+  resultId: string;
+  resultDate: string;
+  value: number;
+  zScore: number;
+  status: QCStatus;
+  westgardFlags: string | null;
+}
+
+export interface LeveyJenningsDto {
+  qcSampleId: string;
+  qcSampleName: string;
+  level: string;
+  testFileParameterId: string;
+  parameterName: string;
+  unit: string | null;
+  hasTarget: boolean;
+  mean: number;
+  sd: number;
+  cv: number;
+  plus1SD: number;
+  plus2SD: number;
+  plus3SD: number;
+  minus1SD: number;
+  minus2SD: number;
+  minus3SD: number;
+  totalCount: number;
+  acceptedCount: number;
+  warningCount: number;
+  rejectedCount: number;
+  points: LeveyJenningsPoint[];
+}
+
 const qcResultService = {
   getAll: (params?: {
     qcSampleId?: string;
@@ -61,6 +94,13 @@ const qcResultService = {
 
   upsertTarget: (qcSampleId: string, payload: { testFileParameterId: string; mean: number; sd: number; cv: number }) =>
     api.put<{ data: QCSampleTargetDto }>(`/api/qcsamples/${qcSampleId}/targets`, payload),
+
+  getLeveyJennings: (params: {
+    qcSampleId: string;
+    testFileParameterId: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) => api.get<{ data: LeveyJenningsDto }>("/api/qcresults/levey-jennings", { params }),
 };
 
 export default qcResultService;
