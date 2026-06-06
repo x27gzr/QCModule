@@ -23,17 +23,19 @@ public class QCResultsController(IMediator mediator) : ControllerBase
     public async Task<ActionResult<Result<PaginatedResult<QCResultSummaryDto>>>> GetAll(
         [FromQuery] Guid?                qcSampleId,
         [FromQuery] Guid?                testFileParameterId,
+        [FromQuery] Guid?                instrumentId,
         [FromQuery] QCStatus?            status,
         [FromQuery] ValidationStatus?    validationStatus,
         [FromQuery] AuthorisationStatus? authorisationStatus,
         [FromQuery] DateTime?            dateFrom,
         [FromQuery] DateTime?            dateTo,
-        [FromQuery] int                  page     = 1,
-        [FromQuery] int                  pageSize = 20,
+        [FromQuery] bool                 includeDeleted = false,
+        [FromQuery] int                  page           = 1,
+        [FromQuery] int                  pageSize       = 20,
         CancellationToken ct = default)
         => Ok(await mediator.Send(new GetQCResultsQuery(
-            qcSampleId, testFileParameterId, status, validationStatus, authorisationStatus,
-            dateFrom, dateTo, page, pageSize), ct));
+            qcSampleId, testFileParameterId, instrumentId, status, validationStatus, authorisationStatus,
+            dateFrom, dateTo, includeDeleted, page, pageSize), ct));
 
     [HttpPost]
     [Authorize(Policy = Permissions.QCResults.Create)]

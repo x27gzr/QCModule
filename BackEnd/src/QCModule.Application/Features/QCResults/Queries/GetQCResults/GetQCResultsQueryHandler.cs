@@ -16,7 +16,9 @@ public class GetQCResultsQueryHandler(
     public async Task<Result<PaginatedResult<QCResultSummaryDto>>> Handle(
         GetQCResultsQuery request, CancellationToken cancellationToken)
     {
-        var results = await resultRepo.GetAllAsync(cancellationToken);
+        var results = request.IncludeDeleted
+            ? await resultRepo.GetAllIncludingDeletedAsync(cancellationToken)
+            : await resultRepo.GetAllAsync(cancellationToken);
         var samples = await sampleRepo.GetAllAsync(cancellationToken);
         var params_ = await paramRepo.GetAllAsync(cancellationToken);
         var users   = await userRepo.GetAllAsync(cancellationToken);
@@ -27,6 +29,8 @@ public class GetQCResultsQueryHandler(
 
         var query = results.AsEnumerable();
 
+        if (request.InstrumentId.HasValue)
+            query = query.Where(r => sampleMap.TryGetValue(r.QCSampleId, out var s) && s.InstrumentId == request.InstrumentId.Value);
         if (request.QCSampleId.HasValue)          query = query.Where(r => r.QCSampleId == request.QCSampleId.Value);
         if (request.TestFileParameterId.HasValue)  query = query.Where(r => r.TestFileParameterId == request.TestFileParameterId.Value);
         if (request.Status.HasValue)               query = query.Where(r => r.Status == request.Status.Value);

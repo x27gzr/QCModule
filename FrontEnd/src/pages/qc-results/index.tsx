@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { PlusIcon, ArrowPathIcon, ChartBarIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, ClockIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, ArrowPathIcon, ChartBarIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, ClockIcon, ShieldCheckIcon, FunnelIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import dayjs from "dayjs";
 import qcResultService, { type QCResultSummaryDto, type QCStatus, type ValidationStatus, type AuthorisationStatus } from "@/services/qcResultService";
 import qcSampleService, { type QCSampleSummaryDto } from "@/services/qcSampleService";
+import instrumentService, { type InstrumentSummaryDto } from "@/services/instrumentService";
 import testFileService, { type TestFileDto } from "@/services/testFileService";
 import { useAuth } from "@/contexts/auth/context";
 import { getErrorMessage } from "@/utils/apiError";
@@ -196,23 +197,90 @@ export default function QCResultsPage() {
   const { user: me } = useAuth();
   const canValidate = me?.role === "Admin" || me?.role === "Supervisor" || me?.role === "Analyst";
 
-  const [results, setResults] = useState<QCResultSummaryDto[]>([]);
-  const [total,   setTotal]   = useState(0);
-  const [page,    setPage]    = useState(1);
-  const [valFilter, setValFilter] = useState<ValidationStatus | "">("");
-  const [loading, setLoading] = useState(true);
-  const [showEntry,  setShowEntry]  = useState(false);
-  const [validating, setValidating] = useState<QCResultSummaryDto | null>(null);
+  const [results,     setResults]     = useState<QCResultSummaryDto[]>([]);
+  const [total,       setTotal]       = useState(0);
+  const [page,        setPage]        = useState(1);
+  const [loading,     setLoading]     = useState(true);
+  const [showEntry,   setShowEntry]   = useState(false);
+  const [validating,  setValidating]  = useState<QCResultSummaryDto | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter state
+  const [instruments,  setInstruments]  = useState<InstrumentSummaryDto[]>([]);
+  const [allSamples,   setAllSamples]   = useState<QCSampleSummaryDto[]>([]);
+  const [filtSamples,  setFiltSamples]  = useState<QCSampleSummaryDto[]>([]);
+  const [parameters,   setParameters]   = useState<{ id: string; label: string }[]>([]);
+
+  const [fInstrument, setFInstrument]  = useState("");
+  const [fSample,     setFSample]      = useState("");
+  const [fParam,      setFParam]       = useState("");
+  const [fDateFrom,   setFDateFrom]    = useState("");
+  const [fDateTo,     setFDateTo]      = useState("");
+  const [fValStatus,  setFValStatus]   = useState<ValidationStatus | "">("");
+  const [fDeleted,    setFDeleted]     = useState(false);
 
   const pageSize = 20;
+
+  // Load instruments + samples once
+  useEffect(() => {
+    instrumentService.getInstruments({ pageSize: 100 }).then(r => setInstruments(r.data.data.items));
+    qcSampleService.getAll({ pageSize: 200 }).then(r => {
+      setAllSamples(r.data.data.items);
+      setFiltSamples(r.data.data.items);
+    });
+  }, []);
+
+  // Filter samples by instrument
+  useEffect(() => {
+    if (fInstrument) {
+      const filtered = allSamples.filter(s => {
+        const instr = instruments.find(i => i.id === fInstrument);
+        return instr && s.instrumentName === instr.name;
+      });
+      setFiltSamples(filtered);
+    } else {
+      setFiltSamples(allSamples);
+    }
+    setFSample("");
+    setFParam("");
+    setParameters([]);
+  }, [fInstrument, allSamples, instruments]);
+
+  // Load parameters when sample changes
+  useEffect(() => {
+    if (fSample) {
+      qcResultService.getTargets(fSample).then(r =>
+        setParameters(r.data.data.map(t => ({ id: t.testFileParameterId, label: t.parameterName }))));
+    } else {
+      setParameters([]);
+    }
+    setFParam("");
+  }, [fSample]);
+
+  const clearFilters = () => {
+    setFInstrument(""); setFSample(""); setFParam("");
+    setFDateFrom(""); setFDateTo(""); setFValStatus(""); setFDeleted(false);
+    setPage(1);
+  };
+
+  const hasActiveFilters = fInstrument || fSample || fParam || fDateFrom || fDateTo || fValStatus || fDeleted;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await qcResultService.getAll({ validationStatus: valFilter || undefined, page, pageSize });
+      const res = await qcResultService.getAll({
+        instrumentId:        fInstrument  || undefined,
+        qcSampleId:          fSample      || undefined,
+        testFileParameterId: fParam       || undefined,
+        dateFrom:            fDateFrom    || undefined,
+        dateTo:              fDateTo      || undefined,
+        validationStatus:    fValStatus   || undefined,
+        includeDeleted:      fDeleted     || undefined,
+        page, pageSize,
+      });
       setResults(res.data.data.items); setTotal(res.data.data.totalCount);
     } finally { setLoading(false); }
-  }, [valFilter, page]);
+  }, [fInstrument, fSample, fParam, fDateFrom, fDateTo, fValStatus, fDeleted, page]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -245,18 +313,91 @@ export default function QCResultsPage() {
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <select value={valFilter} onChange={e => { setValFilter(e.target.value as any); setPage(1); }}
-          className="dark:bg-dark-800 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none">
-          <option value="">All Validation</option>
-          <option value="Pending">Pending Validation</option>
-          <option value="Validated">Validated</option>
-          <option value="Rejected">Rejected</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowFilters(v => !v)}
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${showFilters || hasActiveFilters ? "border-primary-400 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400 dark:border-primary-600" : "border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-dark-600 dark:text-dark-300 dark:hover:bg-dark-700"}`}>
+            <FunnelIcon className="size-4" />
+            Filters
+            {hasActiveFilters && <span className="ml-1 rounded-full bg-primary-600 px-1.5 py-0.5 text-xs text-white">ON</span>}
+          </button>
+          {hasActiveFilters && (
+            <button onClick={clearFilters} className="text-xs text-gray-400 hover:text-gray-600 dark:text-dark-400 dark:hover:text-dark-200">
+              Clear all
+            </button>
+          )}
+        </div>
         <div className="flex gap-2">
           <button onClick={load} className="dark:text-dark-300 dark:hover:bg-dark-700 rounded-lg p-2 text-gray-500 hover:bg-gray-100"><ArrowPathIcon className="size-4" /></button>
           <button onClick={() => setShowEntry(true)} className="bg-primary-600 hover:bg-primary-700 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"><PlusIcon className="size-4" />Enter Result</button>
         </div>
       </div>
+
+      {/* Filter panel */}
+      {showFilters && (
+        <div className="dark:bg-dark-800 dark:border-dark-600 rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {/* Instrument */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-dark-400">Instrument</label>
+              <select value={fInstrument} onChange={e => { setFInstrument(e.target.value); setPage(1); }}
+                className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                <option value="">All</option>
+                {instruments.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+              </select>
+            </div>
+            {/* QC Sample */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-dark-400">QC Sample</label>
+              <select value={fSample} onChange={e => { setFSample(e.target.value); setPage(1); }}
+                className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                <option value="">All</option>
+                {filtSamples.map(s => <option key={s.id} value={s.id}>{s.lotNumber} – {s.level}</option>)}
+              </select>
+            </div>
+            {/* Parameter */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-dark-400">Parameter</label>
+              <select value={fParam} onChange={e => { setFParam(e.target.value); setPage(1); }}
+                disabled={!fSample}
+                className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50 disabled:opacity-50">
+                <option value="">{fSample ? "All" : "Select sample first"}</option>
+                {parameters.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+            </div>
+            {/* Date From */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-dark-400">Date From</label>
+              <input type="date" value={fDateFrom} onChange={e => { setFDateFrom(e.target.value); setPage(1); }}
+                className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+            </div>
+            {/* Date To */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-dark-400">Date To</label>
+              <input type="date" value={fDateTo} onChange={e => { setFDateTo(e.target.value); setPage(1); }}
+                className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+            </div>
+            {/* Validation status */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-dark-400">Status</label>
+              <select value={fValStatus} onChange={e => { setFValStatus(e.target.value as any); setPage(1); }}
+                className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                <option value="">All</option>
+                <option value="Pending">Pending</option>
+                <option value="Validated">Validated</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+          {/* Show deleted toggle */}
+          <div className="mt-3 flex items-center gap-2">
+            <button onClick={() => { setFDeleted(v => !v); setPage(1); }}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium ${fDeleted ? "border-red-300 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:border-red-700" : "border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-dark-600 dark:text-dark-400 dark:hover:bg-dark-700"}`}>
+              {fDeleted ? <EyeIcon className="size-3.5" /> : <EyeSlashIcon className="size-3.5" />}
+              {fDeleted ? "Showing deleted" : "Show deleted"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="dark:bg-dark-800 dark:border-dark-600 border-gray-150 overflow-x-auto rounded-xl border bg-white shadow-xs">

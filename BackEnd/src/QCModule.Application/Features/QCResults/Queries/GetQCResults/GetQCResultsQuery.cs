@@ -8,11 +8,13 @@ namespace QCModule.Application.Features.QCResults.Queries.GetQCResults;
 public record GetQCResultsQuery(
     Guid?                QCSampleId          = null,
     Guid?                TestFileParameterId = null,
+    Guid?                InstrumentId        = null,
     QCStatus?            Status              = null,
     ValidationStatus?    ValidationStatus    = null,
     AuthorisationStatus? AuthorisationStatus = null,
     DateTime?            DateFrom            = null,
     DateTime?            DateTo              = null,
+    bool                 IncludeDeleted      = false,
     int                  Page                = 1,
     int                  PageSize            = 20
 ) : IRequest<Result<PaginatedResult<QCResultSummaryDto>>>;

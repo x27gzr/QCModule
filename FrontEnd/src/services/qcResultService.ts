@@ -91,11 +91,13 @@ const qcResultService = {
   getAll: (params?: {
     qcSampleId?: string;
     testFileParameterId?: string;
+    instrumentId?: string;
     status?: QCStatus;
     validationStatus?: ValidationStatus;
     authorisationStatus?: AuthorisationStatus;
     dateFrom?: string;
     dateTo?: string;
+    includeDeleted?: boolean;
     page?: number;
     pageSize?: number;
   }) => api.get<{ data: PaginatedResult<QCResultSummaryDto> }>("/api/qcresults", { params }),
