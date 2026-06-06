@@ -59,7 +59,9 @@ public class GetQCResultsQueryHandler(
                     r.ValidatedAt,
                     r.AuthorisationStatus,
                     r.AuthorisedBy.HasValue ? userMap.GetValueOrDefault(r.AuthorisedBy.Value) : null,
-                    r.AuthorisedAt);
+                    r.AuthorisedAt,
+                    r.IsDeleted,
+                    r.DeletedReason);
             }).ToList();
 
         return Result<PaginatedResult<QCResultSummaryDto>>.Success(new PaginatedResult<QCResultSummaryDto>

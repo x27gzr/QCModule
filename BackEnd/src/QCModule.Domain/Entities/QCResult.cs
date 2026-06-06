@@ -33,4 +33,7 @@ public class QCResult : BaseEntity
     public Guid?     AuthorisedBy { get; set; }
     public User?     AuthorisedByUser { get; set; }
     public DateTime? AuthorisedAt { get; set; }
+
+    // ── Soft delete ───────────────────────────────────────────────────────────
+    public string?   DeletedReason { get; set; }
 }

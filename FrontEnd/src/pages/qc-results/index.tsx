@@ -153,6 +153,45 @@ function EntryModal({ onSave, onClose }: { onSave: (data: EntryForm) => Promise<
   );
 }
 
+// ── Delete modal ──────────────────────────────────────────────────────────────
+function DeleteResultModal({ result, onConfirm, onClose }: {
+  result: QCResultSummaryDto;
+  onConfirm: (reason: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const handle = async () => {
+    if (!reason.trim()) { toast.error("Reason is required."); return; }
+    setLoading(true);
+    try { await onConfirm(reason); toast.success("Result deleted."); onClose(); }
+    catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setLoading(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="dark:bg-dark-800 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <h2 className="dark:text-dark-100 mb-2 text-lg font-semibold text-red-600">Delete QC Result</h2>
+        <div className="dark:bg-dark-700 mb-4 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+          <p className="dark:text-dark-200 font-medium">{result.qcSampleName} — {result.parameterName}</p>
+          <p className="dark:text-dark-400 text-gray-500">Value: {result.value} · {dayjs(result.resultDate).format("DD MMM YYYY")}</p>
+        </div>
+        <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">Reason for deletion *</label>
+        <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3}
+          className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 mb-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/50"
+          placeholder="Enter reason…" />
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="dark:text-dark-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-dark-700">Cancel</button>
+          <button onClick={handle} disabled={loading || !reason.trim()}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">
+            {loading ? "Deleting…" : "Confirm Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Edit modal ────────────────────────────────────────────────────────────────
 const editSchema = z.object({
   resultDate: z.string().min(1, "Date required"),
@@ -270,6 +309,7 @@ export default function QCResultsPage() {
   const [loading,     setLoading]     = useState(true);
   const [showEntry,   setShowEntry]   = useState(false);
   const [editing,     setEditing]     = useState<QCResultSummaryDto | null>(null);
+  const [deleting,    setDeleting]    = useState<QCResultSummaryDto | null>(null);
   const [validating,  setValidating]  = useState<QCResultSummaryDto | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -361,6 +401,19 @@ export default function QCResultsPage() {
   const handleEdit = async (data: any) => {
     await qcResultService.update(editing!.id, data);
     load();
+  };
+
+  const handleDelete = async (reason: string) => {
+    await qcResultService.delete(deleting!.id, reason);
+    load();
+  };
+
+  const handleRestore = async (r: QCResultSummaryDto) => {
+    try {
+      await qcResultService.restore(r.id);
+      toast.success("Result restored.");
+      load();
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const handleValidate = async (reject: boolean, note?: string) => {
@@ -498,7 +551,7 @@ export default function QCResultsPage() {
                 </td>
               </tr>
             ) : results.map(r => (
-              <tr key={r.id} className={`dark:hover:bg-dark-700/50 hover:bg-gray-50 transition-colors ${r.status === "Rejected" ? "bg-red-50/30 dark:bg-red-900/5" : r.status === "Warning" ? "bg-amber-50/30 dark:bg-amber-900/5" : ""}`}>
+              <tr key={r.id} className={`dark:hover:bg-dark-700/50 hover:bg-gray-50 transition-colors ${r.isDeleted ? "opacity-50 bg-red-50/40 dark:bg-red-900/10" : r.status === "Rejected" ? "bg-red-50/30 dark:bg-red-900/5" : r.status === "Warning" ? "bg-amber-50/30 dark:bg-amber-900/5" : ""}`}>
                 <td className="px-4 py-3">
                   <p className="text-sm font-medium text-gray-800 dark:text-dark-100">{r.parameterName}{r.unit ? ` (${r.unit})` : ""}</p>
                   <p className="text-xs text-gray-400 dark:text-dark-400">{r.qcSampleName} · {r.level}</p>
@@ -517,20 +570,30 @@ export default function QCResultsPage() {
                 {canValidate && (
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {r.validationStatus === "Pending" && (
+                      {r.isDeleted ? (
+                        <button onClick={() => handleRestore(r)}
+                          className="rounded-lg px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20">Restore</button>
+                      ) : (
                         <>
-                          <button onClick={() => setEditing(r)}
-                            className="rounded-lg px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-600">Edit</button>
-                          <button onClick={() => setValidating(r)}
-                            className="rounded-lg px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20">Validate</button>
+                          {r.validationStatus === "Pending" && (
+                            <>
+                              <button onClick={() => setEditing(r)}
+                                className="rounded-lg px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-600">Edit</button>
+                              <button onClick={() => setValidating(r)}
+                                className="rounded-lg px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20">Validate</button>
+                            </>
+                          )}
+                          {r.validationStatus !== "Pending" && r.authorisationStatus !== "Authorised" && (
+                            <button onClick={() => handleCancelValidation(r)}
+                              className="rounded-lg px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-600">Cancel</button>
+                          )}
+                          {r.authorisationStatus === "Authorised" ? (
+                            <span className="text-xs text-gray-300 dark:text-dark-500">Locked</span>
+                          ) : (
+                            <button onClick={() => setDeleting(r)}
+                              className="rounded-lg px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">Delete</button>
+                          )}
                         </>
-                      )}
-                      {r.validationStatus !== "Pending" && r.authorisationStatus !== "Authorised" && (
-                        <button onClick={() => handleCancelValidation(r)}
-                          className="rounded-lg px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-600">Cancel</button>
-                      )}
-                      {r.authorisationStatus === "Authorised" && (
-                        <span className="text-xs text-gray-300 dark:text-dark-500">Locked</span>
                       )}
                     </div>
                   </td>
@@ -554,6 +617,7 @@ export default function QCResultsPage() {
 
       {showEntry  && <EntryModal onSave={handleEntry} onClose={() => { setShowEntry(false); load(); }} />}
       {editing    && <EditModal result={editing} onSave={handleEdit} onClose={() => setEditing(null)} />}
+      {deleting   && <DeleteResultModal result={deleting} onConfirm={handleDelete} onClose={() => setDeleting(null)} />}
       {validating && <ValidateModal result={validating} onValidate={handleValidate} onClose={() => setValidating(null)} />}
     </div>
   );

@@ -1,0 +1,276 @@
+
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=DM+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0F1117; font-family: 'DM Sans', sans-serif; color: #E2E8F0; }
+.wrap { padding: 20px; }
+h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+.mono { font-family: 'DM Mono', monospace; }
+.badge { font-size: 11px; background: #2D3748; color: #90CDF4; padding: 2px 10px; border-radius: 4px; vertical-align: middle; }
+.cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin: 16px 0; }
+.card { background: #1A202C; border: 0.5px solid #2D3748; border-radius: 10px; padding: 12px 14px; }
+.card-label { font-size: 11px; color: #718096; margin-bottom: 4px; }
+.card-value { font-size: 22px; font-weight: 700; font-family: 'DM Mono', monospace; }
+.ctrl { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; }
+.ctrl span { font-size: 12px; color: #718096; }
+.day-btn { font-size: 12px; padding: 4px 14px; border-radius: 6px; cursor: pointer; font-family: 'DM Mono', monospace; border: none; transition: all 0.15s; }
+.panel { background: #1A202C; border: 0.5px solid #2D3748; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+.section-label { font-size: 10px; color: #718096; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+.heatmap-scroll { overflow-x: auto; }
+table.hm { border-collapse: separate; border-spacing: 2px; width: 100%; }
+table.hm td, table.hm th { padding: 0; font-size: 10px; font-family: 'DM Mono', monospace; }
+table.hm th.row-label { color: #A0AEC0; text-align: right; padding-right: 8px; font-size: 11px; white-space: nowrap; min-width: 160px; }
+table.hm th.col-label { color: #718096; text-align: center; min-width: 22px; font-weight: 400; font-size: 10px; }
+table.hm td.cell { width: 22px; height: 28px; border-radius: 3px; cursor: pointer; transition: transform 0.1s, outline 0.1s; position: relative; }
+table.hm td.cell:hover { transform: scale(1.3); outline: 2px solid #63B3ED; z-index: 10; }
+.legend-bar { height: 8px; border-radius: 4px; background: linear-gradient(to right,#d73027,#f46d43,#fdae61,#fee08b,#d9ef8b,#a6d96a,#1a9850); margin: 6px 0; }
+.legend-labels { display: flex; justify-content: space-between; font-size: 10px; font-family: 'DM Mono', monospace; color: #718096; }
+.rule-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.rule-item { display: flex; align-items: center; gap: 6px; font-size: 11px; font-family: 'DM Mono', monospace; color: #A0AEC0; }
+.rule-dot { width: 10px; height: 10px; border-radius: 3px; }
+.viols { display: flex; flex-direction: column; gap: 5px; max-height: 180px; overflow-y: auto; }
+.viol-row { display: flex; align-items: center; gap: 10px; font-size: 11px; font-family: 'DM Mono', monospace; padding: 5px 10px; border-radius: 6px; background: #2D3748; border-left: 3px solid; }
+.tooltip-box { position: fixed; background: #1A202C; border-radius: 8px; padding: 10px 14px; font-size: 12px; font-family: 'DM Mono', monospace; pointer-events: none; z-index: 999; min-width: 200px; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+.tt-title { font-weight: 700; font-size: 13px; color: #F7FAFC; margin-bottom: 8px; }
+.tt-grid { display: grid; grid-template-columns: auto auto; gap: 3px 14px; }
+.tt-key { color: #718096; }
+.tt-val { font-weight: 600; }
+</style>
+
+<div class="wrap">
+  <div style="margin-bottom:16px;">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">
+      <h1>QC Lab — Westgard Heatmap</h1>
+      <span class="badge mono">Juni 2025</span>
+    </div>
+    <p style="font-size:13px;color:#718096;">Visualisasi pelanggaran Westgard Rules per analit per hari</p>
+  </div>
+
+  <div class="cards" id="summaryCards"></div>
+
+  <div class="ctrl">
+    <span>Jumlah hari:</span>
+    <button class="day-btn" data-d="10" onclick="setDays(10)">10 hari</button>
+    <button class="day-btn" data-d="20" onclick="setDays(20)">20 hari</button>
+    <button class="day-btn" data-d="31" onclick="setDays(31)">31 hari</button>
+  </div>
+
+  <div class="panel">
+    <div class="heatmap-scroll">
+      <table class="hm" id="hmTable"></table>
+    </div>
+    <div style="margin-top:10px;padding:0 4px;">
+      <div class="legend-bar"></div>
+      <div class="legend-labels"><span>−3SD</span><span>−2SD</span><span>−1SD</span><span>Mean</span><span>+1SD</span><span>+2SD</span><span>+3SD</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="section-label">Westgard Rules</div>
+    <div class="rule-legend" id="ruleLegend"></div>
+  </div>
+
+  <div class="panel" id="violPanel" style="display:none;">
+    <div class="section-label">Log Pelanggaran (<span id="violCount">0</span>)</div>
+    <div class="viols" id="violList"></div>
+  </div>
+</div>
+
+<div class="tooltip-box" id="tt">
+  <div class="tt-title" id="ttTitle"></div>
+  <div class="tt-grid" id="ttGrid"></div>
+</div>
+
+<script>
+const ANALYTES = [
+  { id:"hb",   name:"Hemoglobin",  unit:"g/dL",  mean:14.2,  sd:0.35, level:"Normal"   },
+  { id:"glc",  name:"Glukosa",     unit:"mg/dL", mean:100,   sd:3.2,  level:"Normal"   },
+  { id:"crea", name:"Kreatinin",   unit:"mg/dL", mean:1.05,  sd:0.04, level:"Normal"   },
+  { id:"hb2",  name:"Hemoglobin",  unit:"g/dL",  mean:19.5,  sd:0.55, level:"Abnormal" },
+  { id:"glc2", name:"Glukosa",     unit:"mg/dL", mean:400,   sd:12,   level:"Abnormal" },
+];
+
+const RULES = {
+  "1_3s":{ label:"1₃ₛ Reject",  color:"#C53030", bg:"rgba(197,48,48,0.15)" },
+  "2_2s":{ label:"2₂ₛ Warning", color:"#C05621", bg:"rgba(192,86,33,0.15)" },
+  "R_4s":{ label:"R₄ₛ Warning", color:"#B7791F", bg:"rgba(183,121,31,0.15)" },
+  "4_1s":{ label:"4₁ₛ Warning", color:"#2B6CB0", bg:"rgba(43,108,176,0.15)" },
+  "10x": { label:"10ₓ Warning", color:"#276749", bg:"rgba(39,103,73,0.15)" },
+  "ok":  { label:"In Control",  color:"#276749", bg:"rgba(39,103,73,0.15)" },
+};
+
+function boxMuller() {
+  return Math.sqrt(-2*Math.log(Math.random()))*Math.cos(2*Math.PI*Math.random());
+}
+
+function genData(mean, sd, days) {
+  const injected = { 4:3.4, 11:2.5, 12:2.3, 18:-3.2 };
+  const raw = Array.from({length:days},(_,i) => {
+    const z = injected[i] !== undefined ? injected[i] : boxMuller()*0.7;
+    return +(mean + z*sd).toFixed(3);
+  });
+  return raw.map((value,i) => {
+    const zScore = (value-mean)/sd;
+    let rule = "ok";
+    if (Math.abs(zScore)>3) rule="1_3s";
+    else if (i>=1) {
+      const pz=(raw[i-1]-mean)/sd;
+      if (Math.abs(zScore)>2&&Math.abs(pz)>2&&Math.sign(zScore)===Math.sign(pz)) rule="2_2s";
+      else if (Math.abs(zScore-pz)>4) rule="R_4s";
+    }
+    if (rule==="ok"&&i>=3) {
+      const seg=raw.slice(i-3,i+1).map(v=>v-mean);
+      if (seg.every(v=>v>sd)||seg.every(v=>v<-sd)) rule="4_1s";
+    }
+    if (rule==="ok"&&i>=9) {
+      const seg=raw.slice(i-9,i+1).map(v=>v-mean);
+      if (seg.every(v=>v>0)||seg.every(v=>v<0)) rule="10x";
+    }
+    return {day:i+1,value,zScore:+zScore.toFixed(2),rule};
+  });
+}
+
+// z to color: red_yellow_green diverging
+function zToColor(z) {
+  const t = Math.max(0, Math.min(1, (z + 3.5) / 7));
+  const stops = [
+    [0,   [215,48,39]],
+    [0.25,[244,109,67]],
+    [0.375,[253,174,97]],
+    [0.5, [255,255,191]],
+    [0.625,[166,217,106]],
+    [0.75,[102,189,99]],
+    [1,   [26,152,80]],
+  ];
+  let lo=stops[0], hi=stops[stops.length-1];
+  for (let i=0;i<stops.length-1;i++) {
+    if (t>=stops[i][0]&&t<=stops[i+1][0]) { lo=stops[i]; hi=stops[i+1]; break; }
+  }
+  const f=(t-lo[0])/(hi[0]-lo[0]);
+  const r=Math.round(lo[1][0]+(hi[1][0]-lo[1][0])*f);
+  const g=Math.round(lo[1][1]+(hi[1][1]-lo[1][1])*f);
+  const b=Math.round(lo[1][2]+(hi[1][2]-lo[1][2])*f);
+  return `rgb(${r},${g},${b})`;
+}
+
+let currentDays = 20;
+let allData = {};
+
+function generate() {
+  allData = {};
+  ANALYTES.forEach(a => { allData[a.id] = genData(a.mean, a.sd, currentDays); });
+}
+
+function render() {
+  generate();
+
+  // summary
+  let totalViol=0;
+  ANALYTES.forEach(a=>{ totalViol+=allData[a.id].filter(e=>e.rule!=="ok").length; });
+  const total=ANALYTES.length*currentDays;
+  const inCtrl=total-totalViol;
+  const pct=((inCtrl/total)*100).toFixed(1);
+  document.getElementById('summaryCards').innerHTML=[
+    {label:"Total Pengukuran",value:total,color:"#90CDF4"},
+    {label:"In Control",value:inCtrl,color:"#68D391"},
+    {label:"Pelanggaran",value:totalViol,color:totalViol>0?"#FC8181":"#68D391"},
+    {label:"Pass Rate",value:pct+"%",color:parseFloat(pct)>=95?"#68D391":"#F6AD55"},
+  ].map(c=>`<div class="card"><div class="card-label">${c.label}</div><div class="card-value mono" style="color:${c.color}">${c.value}</div></div>`).join('');
+
+  // heatmap table
+  const days = Array.from({length:currentDays},(_,i)=>i+1);
+  let html = '<tr><th class="row-label"></th>';
+  days.forEach(d => { html+=`<th class="col-label mono">H${String(d).padStart(2,'0')}</th>`; });
+  html+='</tr>';
+
+  ANALYTES.forEach(a => {
+    const label = `${a.name}<br><span style="color:#718096;font-size:9px">${a.level}</span>`;
+    html+=`<tr><th class="row-label">${label}</th>`;
+    allData[a.id].forEach(entry => {
+      const bg = zToColor(entry.zScore);
+      const isViol = entry.rule!=="ok";
+      const borderStyle = isViol ? `outline:2px solid ${RULES[entry.rule].color};outline-offset:-1px;` : '';
+      html+=`<td class="cell" style="background:${bg};${borderStyle}"
+        data-analyte="${a.id}" data-day="${entry.day}"
+        onmouseenter="showTT(event,'${a.id}',${entry.day})"
+        onmouseleave="hideTT()"
+        ></td>`;
+    });
+    html+='</tr>';
+  });
+  document.getElementById('hmTable').innerHTML=html;
+
+  // rule legend
+  document.getElementById('ruleLegend').innerHTML=
+    Object.entries(RULES).map(([k,v])=>
+      `<div class="rule-item"><div class="rule-dot" style="background:${v.color}"></div>${v.label}</div>`
+    ).join('');
+
+  // violations
+  const viols = [];
+  ANALYTES.forEach(a => {
+    allData[a.id].filter(e=>e.rule!=="ok").forEach(entry => {
+      viols.push({analyte:`${a.name} (${a.level})`, entry});
+    });
+  });
+  document.getElementById('violCount').textContent=viols.length;
+  if (viols.length>0) {
+    document.getElementById('violPanel').style.display='block';
+    document.getElementById('violList').innerHTML=viols.map(({analyte,entry})=>
+      `<div class="viol-row" style="border-color:${RULES[entry.rule].color}">
+        <span style="color:#718096;min-width:36px">H${String(entry.day).padStart(2,'0')}</span>
+        <span style="color:${RULES[entry.rule].color};font-weight:700;min-width:90px">${RULES[entry.rule].label}</span>
+        <span style="color:#A0AEC0;flex:1">${analyte}</span>
+        <span style="color:#FC8181">Z=${entry.zScore>=0?'+':''}${entry.zScore}</span>
+      </div>`
+    ).join('');
+  } else {
+    document.getElementById('violPanel').style.display='block';
+    document.getElementById('violList').innerHTML=`<div style="font-size:12px;color:#68D391;padding:6px 10px;background:#276749;background:rgba(39,103,73,0.2);border-radius:6px;border-left:3px solid #68D391">✓ Semua nilai dalam batas kontrol</div>`;
+  }
+
+  // day buttons
+  document.querySelectorAll('.day-btn').forEach(btn=>{
+    const d=parseInt(btn.dataset.d);
+    btn.style.background=d===currentDays?'#3182CE':'#2D3748';
+    btn.style.color=d===currentDays?'#fff':'#A0AEC0';
+    btn.style.fontWeight=d===currentDays?'700':'400';
+  });
+}
+
+function setDays(d) { currentDays=d; render(); }
+
+function showTT(e, aid, day) {
+  const a=ANALYTES.find(x=>x.id===aid);
+  const entry=allData[aid][day-1];
+  const tt=document.getElementById('tt');
+  const rule=RULES[entry.rule];
+  tt.style.border=`1.5px solid ${rule.color}`;
+  document.getElementById('ttTitle').textContent=`${a.name} (${a.level}) — Hari ${day}`;
+  document.getElementById('ttGrid').innerHTML=`
+    <span class="tt-key">Nilai</span><span class="tt-val">${entry.value} ${a.unit}</span>
+    <span class="tt-key">Z-Score</span><span class="tt-val" style="color:${Math.abs(entry.zScore)>2?'#FC8181':'#68D391'}">${entry.zScore>=0?'+':''}${entry.zScore} SD</span>
+    <span class="tt-key">Status</span><span class="tt-val" style="color:${rule.color}">${rule.label}</span>
+  `;
+  tt.style.display='block';
+  moveTT(e);
+}
+
+function hideTT() { document.getElementById('tt').style.display='none'; }
+
+document.addEventListener('mousemove', e=>{
+  const tt=document.getElementById('tt');
+  if(tt.style.display==='block') moveTT(e);
+});
+
+function moveTT(e) {
+  const tt=document.getElementById('tt');
+  let x=e.clientX+14, y=e.clientY+14;
+  if(x+220>window.innerWidth) x=e.clientX-224;
+  if(y+100>window.innerHeight) y=e.clientY-110;
+  tt.style.left=x+'px'; tt.style.top=y+'px';
+}
+
+render();
+</script>

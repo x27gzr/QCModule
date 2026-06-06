@@ -1,0 +1,277 @@
+
+<style>
+  .lj-wrap { padding: 1rem 0; font-family: var(--font-sans); }
+  .lj-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 1.5rem; }
+  .lj-control-group { display: flex; flex-direction: column; gap: 4px; }
+  .lj-control-group label { font-size: 12px; color: var(--color-text-secondary); }
+  .lj-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .lj-metric { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 12px; }
+  .lj-metric .mval { font-size: 20px; font-weight: 500; color: var(--color-text-primary); }
+  .lj-metric .mlabel { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+  .lj-input-row { display: flex; gap: 8px; align-items: center; margin-bottom: 1rem; }
+  .lj-input-row input[type=number] { flex: 1; }
+  .violation-list { margin-top: 1rem; }
+  .violation-item { font-size: 12px; padding: 6px 10px; border-radius: var(--border-radius-md); margin-bottom: 4px; }
+  .viol-warn { background: var(--color-background-warning); color: var(--color-text-warning); }
+  .viol-reject { background: var(--color-background-danger); color: var(--color-text-danger); }
+  .viol-ok { background: var(--color-background-success); color: var(--color-text-success); }
+  .lj-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; font-size: 12px; color: var(--color-text-secondary); }
+  .lj-legend span { display: flex; align-items: center; gap: 5px; }
+  .lj-legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .lj-table-wrap { max-height: 160px; overflow-y: auto; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); margin-top: 1rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: var(--color-background-secondary); padding: 6px 10px; text-align: left; font-weight: 500; position: sticky; top: 0; }
+  td { padding: 5px 10px; border-top: 0.5px solid var(--color-border-tertiary); }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 99px; }
+  .tag-ok { background: var(--color-background-success); color: var(--color-text-success); }
+  .tag-warn { background: var(--color-background-warning); color: var(--color-text-warning); }
+  .tag-reject { background: var(--color-background-danger); color: var(--color-text-danger); }
+  .section-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 8px; }
+</style>
+
+<div class="lj-wrap">
+  <h2 class="sr-only">Simulator Levey-Jennings Chart interaktif dengan Westgard rules</h2>
+
+  <div class="lj-controls">
+    <div class="lj-control-group">
+      <label>Target Mean (nilai referensi)</label>
+      <input type="number" id="inp-mean" value="100" step="0.1">
+    </div>
+    <div class="lj-control-group">
+      <label>SD (standar deviasi)</label>
+      <input type="number" id="inp-sd" value="5" step="0.1" min="0.01">
+    </div>
+  </div>
+
+  <p class="section-label">Input nilai QC</p>
+  <div class="lj-input-row">
+    <input type="number" id="inp-val" placeholder="Masukkan nilai QC..." step="0.01">
+    <button onclick="addValue()">Tambah ↗</button>
+    <button onclick="generateRandom()">Auto fill 20 ↗</button>
+    <button onclick="clearAll()" style="border-color: var(--color-border-primary)">Reset</button>
+  </div>
+
+  <div class="lj-metrics">
+    <div class="lj-metric"><div class="mval" id="m-n">0</div><div class="mlabel">N poin</div></div>
+    <div class="lj-metric"><div class="mval" id="m-mean">–</div><div class="mlabel">Mean aktual</div></div>
+    <div class="lj-metric"><div class="mval" id="m-sd">–</div><div class="mlabel">SD aktual</div></div>
+    <div class="lj-metric"><div class="mval" id="m-cv">–</div><div class="mlabel">%CV</div></div>
+  </div>
+
+  <div class="lj-legend">
+    <span><span class="dot" style="background:#3266ad"></span> Nilai QC</span>
+    <span><span class="dot" style="background:#444" style="border-radius:0;width:18px;height:2px"></span> Mean</span>
+    <span><span style="width:18px;height:2px;background:#1a9e75;display:inline-block"></span> ±1SD</span>
+    <span><span style="width:18px;height:2px;background:#f0a830;display:inline-block"></span> ±2SD</span>
+    <span><span style="width:18px;height:2px;background:#e24b4a;display:inline-block"></span> ±3SD</span>
+  </div>
+
+  <div style="position:relative;width:100%;height:320px;">
+    <canvas id="ljChart" role="img" aria-label="Levey-Jennings chart dengan batas kontrol ±1SD, ±2SD, ±3SD">Levey-Jennings chart simulator.</canvas>
+  </div>
+
+  <div id="violation-area" class="violation-list"></div>
+
+  <div id="table-area"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let values = [];
+let chart = null;
+
+function getMean() { return parseFloat(document.getElementById('inp-mean').value) || 100; }
+function getSD() { return parseFloat(document.getElementById('inp-sd').value) || 5; }
+
+function westgard(vals, mean, sd) {
+  const n = vals.length;
+  const rules = [];
+  if (n === 0) return rules;
+
+  const last = vals[n-1];
+  const z = (v) => (v - mean) / sd;
+  const zLast = z(last);
+
+  if (Math.abs(zLast) > 3) rules.push({ rule: '1₃ₛ', type: 'reject', msg: 'Nilai terakhir melewati ±3SD — tolak run!' });
+  else if (Math.abs(zLast) > 2) rules.push({ rule: '1₂ₛ', type: 'warn', msg: 'Nilai terakhir melewati ±2SD — peringatan.' });
+
+  if (n >= 2) {
+    const z2 = z(vals[n-2]);
+    if ((zLast > 2 && z2 > 2) || (zLast < -2 && z2 < -2)) rules.push({ rule: '2₂ₛ', type: 'reject', msg: '2 nilai berurutan melewati +2SD atau -2SD — tolak run!' });
+    if ((zLast > 0 && z2 < 0) || (zLast < 0 && z2 > 0)) {} // R4s needs both sides
+    if (Math.abs(zLast - z2) > 4) rules.push({ rule: 'R₄ₛ', type: 'reject', msg: 'Range 2 nilai terakhir >4SD — tolak run!' });
+  }
+
+  if (n >= 4) {
+    const last4 = vals.slice(-4).map(z);
+    if (last4.every(v => v > 1) || last4.every(v => v < -1)) rules.push({ rule: '4₁ₛ', type: 'reject', msg: '4 nilai berurutan melewati +1SD atau -1SD — tolak run!' });
+  }
+
+  if (n >= 10) {
+    const last10 = vals.slice(-10).map(z);
+    if (last10.every(v => v > 0) || last10.every(v => v < 0)) rules.push({ rule: '10ₓ', type: 'reject', msg: '10 nilai berurutan di satu sisi mean — tolak run!' });
+  }
+
+  if (rules.length === 0) rules.push({ rule: 'OK', type: 'ok', msg: 'Semua Westgard rules terpenuhi.' });
+  return rules;
+}
+
+function getPointStatus(idx, vals, mean, sd) {
+  const z = (vals[idx] - mean) / sd;
+  if (Math.abs(z) > 3) return 'reject';
+  if (Math.abs(z) > 2) return 'warn';
+  return 'ok';
+}
+
+function render() {
+  const mean = getMean();
+  const sd = getSD();
+  const n = values.length;
+
+  document.getElementById('m-n').textContent = n;
+  if (n > 0) {
+    const avg = values.reduce((a,b) => a+b, 0) / n;
+    const variance = values.reduce((s,v) => s + (v-avg)**2, 0) / n;
+    const sdActual = Math.sqrt(variance);
+    document.getElementById('m-mean').textContent = avg.toFixed(2);
+    document.getElementById('m-sd').textContent = sdActual.toFixed(2);
+    document.getElementById('m-cv').textContent = ((sdActual/avg)*100).toFixed(1) + '%';
+  } else {
+    document.getElementById('m-mean').textContent = '–';
+    document.getElementById('m-sd').textContent = '–';
+    document.getElementById('m-cv').textContent = '–';
+  }
+
+  const labels = values.map((_, i) => 'P' + (i+1));
+  const pointColors = values.map((_, i) => {
+    const s = getPointStatus(i, values, mean, sd);
+    return s === 'reject' ? '#e24b4a' : s === 'warn' ? '#ef9f27' : '#3266ad';
+  });
+  const pointRadius = values.map((_, i) => {
+    const s = getPointStatus(i, values, mean, sd);
+    return s !== 'ok' ? 7 : 5;
+  });
+
+  const lineMin = Math.min(0, ...values, mean - 3.5*sd);
+  const lineMax = Math.max(...values, mean + 3.5*sd) + 0.5;
+
+  const makeHLine = (y, color, dash=[]) => ({
+    type: 'line', label: '', data: labels.map(() => y),
+    borderColor: color, borderWidth: dash.length ? 1 : 1.5,
+    borderDash: dash, pointRadius: 0, fill: false, tension: 0
+  });
+
+  const datasets = [
+    { label: 'QC', data: values, borderColor: '#3266ad', backgroundColor: pointColors,
+      pointBackgroundColor: pointColors, pointRadius, pointHoverRadius: 8,
+      borderWidth: 1.5, tension: 0.2, fill: false },
+    makeHLine(mean, '#444444'),
+    makeHLine(mean + sd, '#1a9e75', [4,3]),
+    makeHLine(mean - sd, '#1a9e75', [4,3]),
+    makeHLine(mean + 2*sd, '#ef9f27', [6,3]),
+    makeHLine(mean - 2*sd, '#ef9f27', [6,3]),
+    makeHLine(mean + 3*sd, '#e24b4a'),
+    makeHLine(mean - 3*sd, '#e24b4a'),
+  ];
+
+  if (chart) {
+    chart.data.labels = labels;
+    chart.data.datasets = datasets;
+    chart.options.scales.y.min = mean - 3.8*sd;
+    chart.options.scales.y.max = mean + 3.8*sd;
+    chart.update();
+  } else {
+    chart = new Chart(document.getElementById('ljChart'), {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          callbacks: { label: ctx => {
+            if (ctx.datasetIndex !== 0) return null;
+            const v = ctx.parsed.y;
+            const z = ((v - mean)/sd).toFixed(2);
+            return `Nilai: ${v.toFixed(2)} (z=${z})`;
+          }}
+        }},
+        scales: {
+          x: { grid: { color: 'rgba(128,128,128,0.1)' }, ticks: { color: '#888', font: { size: 11 } } },
+          y: { min: mean - 3.8*sd, max: mean + 3.8*sd, grid: { color: 'rgba(128,128,128,0.1)' },
+            ticks: { color: '#888', font: { size: 11 }, callback: v => v.toFixed(1) } }
+        }
+      }
+    });
+  }
+
+  const rules = westgard(values, mean, sd);
+  const va = document.getElementById('violation-area');
+  va.innerHTML = rules.map(r =>
+    `<div class="violation-item ${r.type==='reject'?'viol-reject':r.type==='warn'?'viol-warn':'viol-ok'}">
+      <strong>${r.rule}</strong> — ${r.msg}
+    </div>`
+  ).join('');
+
+  if (n > 0) {
+    const colorMap = { ok:'tag-ok', warn:'tag-warn', reject:'tag-reject' };
+    document.getElementById('table-area').innerHTML = `
+      <p class="section-label" style="margin-top:1rem">Riwayat nilai</p>
+      <div class="lj-table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Nilai</th><th>Z-score</th><th>Status</th><th>Aksi</th></tr></thead>
+          <tbody>
+            ${values.map((v,i) => {
+              const z = ((v-mean)/sd).toFixed(2);
+              const s = getPointStatus(i, values, mean, sd);
+              return `<tr>
+                <td>${i+1}</td><td>${v.toFixed(2)}</td><td>${z}</td>
+                <td><span class="tag ${colorMap[s]}">${s==='ok'?'OK':s==='warn'?'Warning':'Reject'}</span></td>
+                <td><button onclick="removeValue(${i})" style="font-size:11px;padding:2px 8px;">Hapus</button></td>
+              </tr>`;
+            }).reverse().join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } else {
+    document.getElementById('table-area').innerHTML = '';
+  }
+}
+
+function addValue() {
+  const inp = document.getElementById('inp-val');
+  const v = parseFloat(inp.value);
+  if (isNaN(v)) return;
+  values.push(v);
+  inp.value = '';
+  render();
+}
+
+function removeValue(idx) {
+  values.splice(idx, 1);
+  render();
+}
+
+function generateRandom() {
+  const mean = getMean();
+  const sd = getSD();
+  values = [];
+  for (let i = 0; i < 20; i++) {
+    let u = 0, v2 = 0;
+    while(u===0) u=Math.random();
+    while(v2===0) v2=Math.random();
+    const z = Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v2);
+    values.push(parseFloat((mean + sd * z).toFixed(2)));
+  }
+  render();
+}
+
+function clearAll() {
+  values = [];
+  render();
+}
+
+document.getElementById('inp-mean').addEventListener('change', render);
+document.getElementById('inp-sd').addEventListener('change', render);
+document.getElementById('inp-val').addEventListener('keydown', e => { if(e.key==='Enter') addValue(); });
+
+render();
+</script>

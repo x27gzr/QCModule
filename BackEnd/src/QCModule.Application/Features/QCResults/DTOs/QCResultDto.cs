@@ -35,7 +35,9 @@ public record QCResultSummaryDto(
     DateTime?           ValidatedAt,
     AuthorisationStatus AuthorisationStatus,
     string?             AuthorisedByName,
-    DateTime?           AuthorisedAt
+    DateTime?           AuthorisedAt,
+    bool                IsDeleted,
+    string?             DeletedReason
 );
 
 public record AuthorisationSummaryDto(

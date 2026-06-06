@@ -22,6 +22,8 @@ export interface QCResultSummaryDto {
   authorisationStatus: AuthorisationStatus;
   authorisedByName: string | null;
   authorisedAt: string | null;
+  isDeleted: boolean;
+  deletedReason: string | null;
 }
 
 export interface AuthorisationSummaryDto {
@@ -112,6 +114,12 @@ const qcResultService = {
 
   update: (id: string, payload: { resultDate: string; value: number; comment?: string }) =>
     api.put<{ data: QCResultDto }>(`/api/qcresults/${id}`, payload),
+
+  delete: (id: string, reason: string) =>
+    api.delete<{ data: boolean; message: string }>(`/api/qcresults/${id}`, { data: { reason } }),
+
+  restore: (id: string) =>
+    api.post<{ data: boolean; message: string }>(`/api/qcresults/${id}/restore`),
 
   // Stage 1 — analyst
   validate: (id: string, payload: { reject: boolean; note?: string }) =>

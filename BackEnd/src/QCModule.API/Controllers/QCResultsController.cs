@@ -5,6 +5,8 @@ using QCModule.Application.Common.Authorization;
 using QCModule.Application.Common.Models;
 using QCModule.Application.Features.QCResults.Commands.AuthoriseQCResult;
 using QCModule.Application.Features.QCResults.Commands.CreateQCResult;
+using QCModule.Application.Features.QCResults.Commands.DeleteQCResult;
+using QCModule.Application.Features.QCResults.Commands.RestoreQCResult;
 using QCModule.Application.Features.QCResults.Commands.UpdateQCResult;
 using QCModule.Application.Features.QCResults.Commands.ValidateQCResult;
 using QCModule.Application.Features.QCResults.DTOs;
@@ -49,6 +51,17 @@ public class QCResultsController(IMediator mediator) : ControllerBase
     public async Task<ActionResult<Result<QCResultDto>>> Update(
         Guid id, [FromBody] UpdateQCResultCommand cmd, CancellationToken ct)
         => Ok(await mediator.Send(cmd with { Id = id }, ct));
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Permissions.QCResults.Create)]
+    public async Task<ActionResult<Result<bool>>> Delete(
+        Guid id, [FromBody] ReasonRequest body, CancellationToken ct)
+        => Ok(await mediator.Send(new DeleteQCResultCommand(id, body.Reason), ct));
+
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Policy = Permissions.QCResults.Create)]
+    public async Task<ActionResult<Result<bool>>> Restore(Guid id, CancellationToken ct)
+        => Ok(await mediator.Send(new RestoreQCResultCommand(id), ct));
 
     // ── Stage 1: Analyst validation ───────────────────────────────────────────
     [HttpPost("{id:guid}/validate")]

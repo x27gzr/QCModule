@@ -40,6 +40,13 @@ public class GenericRepository<T>(ApplicationDbContext context) : IRepository<T>
         return Task.CompletedTask;
     }
 
+    public Task RestoreAsync(T entity, CancellationToken cancellationToken = default)
+    {
+        entity.IsDeleted = false;
+        _dbSet.Update(entity);
+        return Task.CompletedTask;
+    }
+
     public async Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken cancellationToken = default) =>
         predicate is null
             ? await _dbSet.CountAsync(cancellationToken)
