@@ -112,13 +112,16 @@ function computeViolations(
 interface Props {
   data: LeveyJenningsDto;
   westgardRules?: WestgardRules;
+  maxPoints?: number;    // slice to last N points (default: all)
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function LeveyJenningsChart({ data, westgardRules }: Props) {
+export default function LeveyJenningsChart({ data, westgardRules, maxPoints }: Props) {
   const [hover, setHover] = useState<number | null>(null);
 
-  const { mean, sd, points } = data;
+  const { mean, sd } = data;
+  // Slice to last maxPoints
+  const points = maxPoints ? data.points.slice(-maxPoints) : data.points;
 
   // Violations (computed from active rules)
   const violations = westgardRules
@@ -211,6 +214,19 @@ export default function LeveyJenningsChart({ data, westgardRules }: Props) {
                 fill="#94a3b8">{l.v.toFixed(2)}</text>
             </g>
           ))}
+
+          {/* Vertical day separator lines */}
+          {points.map((p, i) => {
+            if (i === 0) return null;
+            const prevDay = dayjs(points[i - 1].resultDate).format("YYYY-MM-DD");
+            const thisDay = dayjs(p.resultDate).format("YYYY-MM-DD");
+            if (prevDay === thisDay) return null;
+            const x = (xOf(i) + xOf(i - 1)) / 2;
+            return (
+              <line key={`sep-${i}`} x1={x} y1={PAD.top} x2={x} y2={PAD.top + PLOT_H}
+                stroke="#94a3b8" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.4" />
+            );
+          })}
 
           {points.length > 1 && (
             <path d={linePath} fill="none" stroke="#64748b" strokeWidth="1.5" opacity="0.6" />

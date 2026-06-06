@@ -375,8 +375,8 @@ export default function QCResultsPage() {
   const [validating,  setValidating]  = useState<QCResultSummaryDto | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  // LJ Chart modal
-  const [ljOpen,       setLjOpen]       = useState(false);
+  // LJ Chart inline panel
+  const [activeChart,  setActiveChart]  = useState<{ sampleId: string; paramId: string; label: string } | null>(null);
   const [ljData,       setLjData]       = useState<LeveyJenningsDto | null>(null);
   const [ljRules,      setLjRules]      = useState<WestgardRules | null>(null);
   const [ljLoading,    setLjLoading]    = useState(false);
@@ -441,16 +441,14 @@ export default function QCResultsPage() {
 
   const hasActiveFilters = fInstrument || fSample || fParam || fDateFrom || fDateTo || fValStatus || fDeleted;
 
-  const openLjChart = async (sampleId: string, paramId: string) => {
-    setLjOpen(true);
+  const loadChart = async (sampleId: string, paramId: string, label: string) => {
+    setActiveChart({ sampleId, paramId, label });
     setLjLoading(true);
     setLjData(null);
     setLjRules(null);
     try {
       const [ljRes, sampleRes] = await Promise.all([
-        qcResultService.getLeveyJennings({ qcSampleId: sampleId, testFileParameterId: paramId,
-          dateFrom: fDateFrom ? dayjs(fDateFrom).toISOString() : undefined,
-          dateTo:   fDateTo   ? dayjs(fDateTo).endOf("day").toISOString() : undefined }),
+        qcResultService.getLeveyJennings({ qcSampleId: sampleId, testFileParameterId: paramId }),
         qcSampleService.getById(sampleId),
       ]);
       setLjData(ljRes.data.data);
@@ -537,7 +535,7 @@ export default function QCResultsPage() {
         </div>
         <div className="flex gap-2">
           {fSample && fParam && (
-            <button onClick={() => openLjChart(fSample, fParam)}
+            <button onClick={() => loadChart(fSample, fParam, `${parameters.find(p => p.id === fParam)?.label ?? "Parameter"}`)}
               className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
               <ChartBarIcon className="size-4" />LJ Chart
             </button>
@@ -649,8 +647,11 @@ export default function QCResultsPage() {
                     </div>
                     <button
                       title="View LJ Chart"
-                      onClick={() => openLjChart(r.qcSampleId, r.testFileParameterId)}
-                      className="ml-auto shrink-0 rounded p-1 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+                      onClick={() => loadChart(r.qcSampleId, r.testFileParameterId, `${r.parameterName} — ${r.qcSampleName} · ${r.level}`)}
+                      className={`ml-auto shrink-0 rounded p-1 transition-colors
+                        ${activeChart?.paramId === r.testFileParameterId && activeChart?.sampleId === r.qcSampleId
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : "text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"}`}>
                       <ChartBarIcon className="size-3.5" />
                     </button>
                   </div>
@@ -726,75 +727,86 @@ export default function QCResultsPage() {
       {cancelling && <CancelValidationModal result={cancelling} onConfirm={handleCancelValidation} onClose={() => setCancelling(null)} />}
       {validating && <ValidateModal result={validating} onValidate={handleValidate} onClose={() => setValidating(null)} />}
 
-      {/* ── Levey-Jennings Chart Modal ───────────────────────────────────── */}
-      {ljOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8">
-          <div className="dark:bg-dark-800 w-full max-w-4xl rounded-2xl bg-white shadow-2xl">
-            {/* Header */}
-            <div className="dark:border-dark-600 flex items-start justify-between border-b border-gray-200 px-6 py-4">
-              <div>
-                {ljData ? (
-                  <>
-                    <h2 className="dark:text-dark-100 text-lg font-semibold text-gray-800">
-                      {ljData.parameterName}{ljData.unit ? ` (${ljData.unit})` : ""} — Levey-Jennings
-                    </h2>
-                    <p className="dark:text-dark-400 mt-0.5 text-sm text-gray-500">
-                      {ljData.qcSampleName} · {ljData.level}
-                      {ljData.hasTarget && ` · Mean ${ljData.mean.toFixed(2)} · SD ${ljData.sd.toFixed(2)} · CV ${ljData.cv.toFixed(2)}%`}
-                    </p>
-                  </>
-                ) : (
-                  <h2 className="dark:text-dark-100 text-lg font-semibold text-gray-800">Levey-Jennings Chart</h2>
+      {/* ── Levey-Jennings Chart Panel (inline, below table) ─────────────── */}
+      <div className="dark:bg-dark-800 dark:border-dark-600 rounded-xl border border-gray-200 bg-white shadow-xs">
+        {/* Panel header */}
+        <div className="dark:border-dark-600 flex items-center justify-between border-b border-gray-100 px-5 py-3">
+          <div>
+            {activeChart ? (
+              <>
+                <span className="dark:text-dark-100 text-sm font-semibold text-gray-800">
+                  Levey-Jennings — {activeChart.label}
+                </span>
+                {ljData?.hasTarget && (
+                  <span className="dark:text-dark-400 ml-2 text-xs text-gray-400">
+                    Mean {ljData.mean.toFixed(2)} · SD {ljData.sd.toFixed(2)} · CV {ljData.cv.toFixed(2)}%
+                  </span>
                 )}
-              </div>
-              <button onClick={() => setLjOpen(false)}
-                className="dark:text-dark-400 ml-4 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-700">
-                <XMarkIcon className="size-5" />
+              </>
+            ) : (
+              <span className="dark:text-dark-400 text-sm text-gray-400">
+                Levey-Jennings Chart — klik icon chart pada baris untuk menampilkan
+              </span>
+            )}
+          </div>
+          {activeChart && (
+            <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-dark-400">
+              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-emerald-500" /> Accepted</span>
+              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-amber-500" /> Warning</span>
+              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-red-500" /> Rejected</span>
+              <button onClick={() => { setActiveChart(null); setLjData(null); setLjRules(null); }}
+                className="ml-2 rounded p-1 hover:bg-gray-100 dark:hover:bg-dark-700">
+                <XMarkIcon className="size-4" />
               </button>
             </div>
-
-            <div className="p-6">
-              {ljLoading ? (
-                <div className="flex h-64 items-center justify-center">
-                  <div className="border-primary-500 size-8 animate-spin rounded-full border-4 border-t-transparent" />
-                </div>
-              ) : !ljData ? null : !ljData.hasTarget ? (
-                <div className="flex h-48 flex-col items-center justify-center text-center">
-                  <ExclamationTriangleIcon className="mb-2 size-10 text-amber-400" />
-                  <p className="dark:text-dark-300 font-medium text-gray-700">No target set for this parameter</p>
-                  <p className="dark:text-dark-400 mt-1 text-sm text-gray-400">Set Mean / SD in QC Samples → Targets first.</p>
-                </div>
-              ) : ljData.points.length === 0 ? (
-                <div className="flex h-48 flex-col items-center justify-center text-center">
-                  <ChartBarIcon className="mb-2 size-10 text-gray-300 dark:text-dark-500" />
-                  <p className="dark:text-dark-400 text-sm text-gray-400">No QC results in the selected date range.</p>
-                </div>
-              ) : (
-                <>
-                  {/* Stats row */}
-                  <div className="mb-5 grid grid-cols-3 gap-3 sm:grid-cols-6">
-                    {[
-                      { label: "Total",    value: ljData.totalCount,    color: "text-gray-800 dark:text-dark-100" },
-                      { label: "Accepted", value: ljData.acceptedCount, color: "text-emerald-600" },
-                      { label: "Warning",  value: ljData.warningCount,  color: "text-amber-500" },
-                      { label: "Rejected", value: ljData.rejectedCount, color: "text-red-600" },
-                      { label: "Mean",     value: ljData.mean.toFixed(2), color: "text-gray-800 dark:text-dark-100" },
-                      { label: "CV (%)",   value: ljData.cv.toFixed(2),   color: "text-gray-800 dark:text-dark-100" },
-                    ].map(s => (
-                      <div key={s.label} className="dark:bg-dark-700 rounded-xl bg-gray-50 px-3 py-2.5">
-                        <p className="dark:text-dark-400 text-xs text-gray-500">{s.label}</p>
-                        <p className={`mt-0.5 text-lg font-bold ${s.color}`}>{s.value}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <LeveyJenningsChart data={ljData} westgardRules={ljRules ?? undefined} />
-                </>
-              )}
-            </div>
-          </div>
+          )}
         </div>
-      )}
+
+        <div className="p-5">
+          {!activeChart ? (
+            <div className="flex h-48 flex-col items-center justify-center text-center">
+              <ChartBarIcon className="mb-2 size-10 text-gray-200 dark:text-dark-600" />
+              <p className="dark:text-dark-400 text-sm text-gray-400">Klik icon <ChartBarIcon className="inline size-3.5 text-emerald-500" /> pada baris hasil untuk menampilkan grafik LJ</p>
+            </div>
+          ) : ljLoading ? (
+            <div className="flex h-48 items-center justify-center">
+              <div className="border-primary-500 size-7 animate-spin rounded-full border-4 border-t-transparent" />
+            </div>
+          ) : !ljData ? null : !ljData.hasTarget ? (
+            <div className="flex h-40 flex-col items-center justify-center text-center">
+              <ExclamationTriangleIcon className="mb-2 size-9 text-amber-400" />
+              <p className="dark:text-dark-300 text-sm font-medium text-gray-700">Belum ada target (Mean/SD) untuk parameter ini</p>
+              <p className="dark:text-dark-400 mt-1 text-xs text-gray-400">Set di QC Samples → Targets terlebih dahulu</p>
+            </div>
+          ) : ljData.points.length === 0 ? (
+            <div className="flex h-40 flex-col items-center justify-center text-center">
+              <ChartBarIcon className="mb-2 size-9 text-gray-300 dark:text-dark-500" />
+              <p className="dark:text-dark-400 text-sm text-gray-400">Belum ada data QC untuk parameter ini</p>
+            </div>
+          ) : (
+            <>
+              {/* Stats strip */}
+              <div className="mb-4 flex flex-wrap gap-3">
+                {[
+                  { label: "N",        value: Math.min(ljData.totalCount, 20), color: "text-gray-700 dark:text-dark-200" },
+                  { label: "Accepted", value: ljData.acceptedCount, color: "text-emerald-600" },
+                  { label: "Warning",  value: ljData.warningCount,  color: "text-amber-500" },
+                  { label: "Rejected", value: ljData.rejectedCount, color: "text-red-600" },
+                  { label: "Mean",     value: ljData.mean.toFixed(2), color: "text-gray-700 dark:text-dark-200" },
+                  { label: "SD",       value: ljData.sd.toFixed(2),   color: "text-gray-700 dark:text-dark-200" },
+                  { label: "CV%",      value: ljData.cv.toFixed(2),   color: "text-gray-700 dark:text-dark-200" },
+                ].map(s => (
+                  <div key={s.label} className="dark:bg-dark-700 rounded-lg bg-gray-50 px-3 py-1.5 text-center">
+                    <p className="text-[10px] text-gray-400 dark:text-dark-400">{s.label}</p>
+                    <p className={`text-sm font-bold ${s.color}`}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
+              <LeveyJenningsChart data={ljData} westgardRules={ljRules ?? undefined} maxPoints={20} />
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
