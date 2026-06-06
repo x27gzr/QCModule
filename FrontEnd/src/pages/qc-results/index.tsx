@@ -20,8 +20,17 @@ const STATUS_CONFIG: Record<QCStatus, { label: string; icon: React.ElementType; 
   Rejected: { label: "Rejected", icon: XCircleIcon,             color: "text-red-600" },
 };
 
+// Normalize numeric enum values from older backend responses
+const STATUS_NUM: Record<string, QCStatus> = { "0":"Pending","1":"Accepted","2":"Warning","3":"Rejected" };
+function normalizeStatus(s: any): QCStatus {
+  if (s === null || s === undefined) return "Pending";
+  const key = String(s);
+  return STATUS_NUM[key] ?? (s as QCStatus);
+}
+
 function StatusBadge({ status }: { status: QCStatus }) {
-  const cfg = STATUS_CONFIG[status]; const Icon = cfg.icon;
+  const cfg = STATUS_CONFIG[normalizeStatus(status)] ?? STATUS_CONFIG.Pending;
+  const Icon = cfg.icon;
   return <span className={`flex items-center gap-1 text-xs font-medium ${cfg.color}`}><Icon className="size-3.5" />{cfg.label}</span>;
 }
 
