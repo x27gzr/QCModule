@@ -730,8 +730,8 @@ export default function QCResultsPage() {
       {cancelling && <CancelValidationModal result={cancelling} onConfirm={handleCancelValidation} onClose={() => setCancelling(null)} />}
       {validating && <ValidateModal result={validating} onValidate={handleValidate} onClose={() => setValidating(null)} />}
 
-      </div>{/* end scrollable inner */}
-      </div>{/* end scrollable outer */}
+      </div>
+      </div>
 
       {/* ── LJ Panel — FIXED di bawah, tidak ikut scroll ─────────────── */}
       <div className="dark:bg-dark-800 dark:border-dark-600 flex h-[270px] shrink-0 flex-col overflow-hidden border-t border-gray-200 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
@@ -838,8 +838,8 @@ export default function QCResultsPage() {
             </div>
           </>
         )}
-      </div>{/* end inner card */}
-      </div>{/* end fixed panel */}
-    </div>{/* end page root */}
+      </div>
+      </div>
+    </div>
   );
 }
