@@ -55,16 +55,14 @@ public class TestFilesController(IMediator mediator) : ControllerBase
     public async Task<ActionResult<Result<TestFileParameterDto>>> AddParameter(
         Guid id, [FromBody] AddParameterRequest body, CancellationToken ct)
         => Ok(await mediator.Send(new AddParameterCommand(
-            id, body.ParameterName, body.TestCode, body.OutputMask, body.Sequence,
-            body.Unit, body.LowerLimit, body.UpperLimit), ct));
+            id, body.ParameterName, body.TestCode, body.OutputMask, body.Sequence), ct));
 
     [HttpPut("{id:guid}/parameters/{parameterId:guid}")]
     [Authorize(Policy = Permissions.Instruments.Manage)]
     public async Task<ActionResult<Result<TestFileParameterDto>>> UpdateParameter(
         Guid id, Guid parameterId, [FromBody] AddParameterRequest body, CancellationToken ct)
         => Ok(await mediator.Send(new UpdateParameterCommand(
-            parameterId, id, body.ParameterName, body.TestCode, body.OutputMask, body.Sequence,
-            body.Unit, body.LowerLimit, body.UpperLimit), ct));
+            parameterId, id, body.ParameterName, body.TestCode, body.OutputMask, body.Sequence), ct));
 
     [HttpDelete("{id:guid}/parameters/{parameterId:guid}")]
     [Authorize(Policy = Permissions.Instruments.Manage)]
@@ -79,8 +77,5 @@ public record AddParameterRequest(
     string  ParameterName,
     string? TestCode,
     string? OutputMask,
-    int     Sequence,
-    string? Unit,
-    double? LowerLimit,
-    double? UpperLimit
+    int     Sequence
 );

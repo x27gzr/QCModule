@@ -24,10 +24,7 @@ public class AddParameterCommandHandler(
             ParameterName = request.ParameterName.Trim(),
             TestCode      = request.TestCode?.Trim(),
             OutputMask    = request.OutputMask?.Trim(),
-            Sequence      = request.Sequence,
-            Unit          = request.Unit?.Trim(),
-            LowerLimit    = request.LowerLimit,
-            UpperLimit    = request.UpperLimit
+            Sequence      = request.Sequence
         };
 
         await paramRepo.AddAsync(param, cancellationToken);
@@ -52,9 +49,6 @@ public class UpdateParameterCommandHandler(IRepository<TestFileParameter> paramR
         param.TestCode      = request.TestCode?.Trim();
         param.OutputMask    = request.OutputMask?.Trim();
         param.Sequence      = request.Sequence;
-        param.Unit          = request.Unit?.Trim();
-        param.LowerLimit    = request.LowerLimit;
-        param.UpperLimit    = request.UpperLimit;
 
         await paramRepo.UpdateAsync(param, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);

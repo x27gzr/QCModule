@@ -9,10 +9,7 @@ public record AddParameterCommand(
     string  ParameterName,
     string? TestCode,
     string? OutputMask,
-    int     Sequence,
-    string? Unit,
-    double? LowerLimit,
-    double? UpperLimit
+    int     Sequence
 ) : IRequest<Result<TestFileParameterDto>>;
 
 public record UpdateParameterCommand(
@@ -21,10 +18,7 @@ public record UpdateParameterCommand(
     string  ParameterName,
     string? TestCode,
     string? OutputMask,
-    int     Sequence,
-    string? Unit,
-    double? LowerLimit,
-    double? UpperLimit
+    int     Sequence
 ) : IRequest<Result<TestFileParameterDto>>;
 
 public record DeleteParameterCommand(Guid ParameterId) : IRequest;

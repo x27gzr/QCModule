@@ -29,9 +29,6 @@ const paramSchema = z.object({
   testCode:      z.string().optional(),
   outputMask:    z.string().optional(),
   sequence:      z.preprocess(v => Number(v), z.number().int().min(0)),
-  unit:          z.string().optional(),
-  lowerLimit:    z.preprocess(v => v === "" ? undefined : Number(v), z.number().optional()),
-  upperLimit:    z.preprocess(v => v === "" ? undefined : Number(v), z.number().optional()),
 });
 
 type FileForm  = z.infer<typeof fileSchema>;
@@ -49,14 +46,10 @@ type ParamRow = {
   testCode: string;
   outputMask: string;
   sequence: number;
-  unit: string;
-  lowerLimit: string;
-  upperLimit: string;
 };
 
 const emptyParam = (seq: number): ParamRow => ({
-  parameterName: "", testCode: "", outputMask: "999990.9",
-  sequence: seq, unit: "", lowerLimit: "", upperLimit: "",
+  parameterName: "", testCode: "", outputMask: "999990.9", sequence: seq,
 });
 
 function FileFormModal({ item, onSave, onClose }: {
@@ -80,9 +73,6 @@ function FileFormModal({ item, onSave, onClose }: {
               testCode:      p.testCode ?? "",
               outputMask:    p.outputMask ?? "",
               sequence:      p.sequence,
-              unit:          p.unit ?? "",
-              lowerLimit:    p.lowerLimit != null ? String(p.lowerLimit) : "",
-              upperLimit:    p.upperLimit != null ? String(p.upperLimit) : "",
             }))
           : [emptyParam(10)]
       );
@@ -118,9 +108,6 @@ function FileFormModal({ item, onSave, onClose }: {
           testCode:   p.testCode.trim()   || undefined,
           outputMask: p.outputMask.trim() || undefined,
           sequence:   Number(p.sequence),
-          unit:       p.unit.trim()       || undefined,
-          lowerLimit: p.lowerLimit !== "" ? Number(p.lowerLimit) : undefined,
-          upperLimit: p.upperLimit !== "" ? Number(p.upperLimit) : undefined,
         })),
       });
       toast.success(item ? "Test file updated." : "Test file created.");
@@ -184,12 +171,9 @@ function FileFormModal({ item, onSave, onClose }: {
               {/* Column headers */}
               <div className="mb-1 grid grid-cols-12 gap-1 px-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-dark-400">
                 <span className="col-span-1">Seq</span>
-                <span className="col-span-2">Test Code</span>
-                <span className="col-span-3">Parameter Name *</span>
+                <span className="col-span-3">Test Code</span>
+                <span className="col-span-5">Parameter Name *</span>
                 <span className="col-span-2">Output Mask</span>
-                <span className="col-span-1">Unit</span>
-                <span className="col-span-1">Low</span>
-                <span className="col-span-1">High</span>
                 <span className="col-span-1" />
               </div>
 
@@ -203,27 +187,15 @@ function FileFormModal({ item, onSave, onClose }: {
                     <input
                       value={row.testCode}
                       onChange={e => updateParam(idx, "testCode", e.target.value)}
-                      className={`col-span-2 ${inlineCls}`} placeholder="Test Code" />
+                      className={`col-span-3 ${inlineCls}`} placeholder="Test Code" />
                     <input
                       value={row.parameterName}
                       onChange={e => updateParam(idx, "parameterName", e.target.value)}
-                      className={`col-span-3 ${inlineCls}`} placeholder="e.g. WBC" />
+                      className={`col-span-5 ${inlineCls}`} placeholder="e.g. WBC" />
                     <input
                       value={row.outputMask}
                       onChange={e => updateParam(idx, "outputMask", e.target.value)}
                       className={`col-span-2 ${inlineCls}`} placeholder="999990.9" />
-                    <input
-                      value={row.unit}
-                      onChange={e => updateParam(idx, "unit", e.target.value)}
-                      className={`col-span-1 ${inlineCls}`} placeholder="Unit" />
-                    <input
-                      type="number" step="any" value={row.lowerLimit}
-                      onChange={e => updateParam(idx, "lowerLimit", e.target.value)}
-                      className={`col-span-1 ${inlineCls}`} placeholder="Low" />
-                    <input
-                      type="number" step="any" value={row.upperLimit}
-                      onChange={e => updateParam(idx, "upperLimit", e.target.value)}
-                      className={`col-span-1 ${inlineCls}`} placeholder="High" />
                     <div className="col-span-1 flex items-center justify-center">
                       <button type="button" onClick={() => removeParam(idx)}
                         disabled={params.length === 1}
@@ -272,9 +244,6 @@ function ParameterRow({ testFileId, param, onDelete }: {
       testCode:      param.testCode ?? "",
       outputMask:    param.outputMask ?? "",
       sequence:      param.sequence,
-      unit:          param.unit ?? "",
-      lowerLimit:    param.lowerLimit ?? undefined,
-      upperLimit:    param.upperLimit ?? undefined,
     },
   });
 
@@ -291,12 +260,9 @@ function ParameterRow({ testFileId, param, onDelete }: {
   if (editing) return (
     <form onSubmit={handleSubmit(save)} className="grid grid-cols-12 gap-1 items-center rounded-lg bg-gray-50 px-3 py-2 dark:bg-dark-700">
       <input {...register("sequence")}      type="number" className={`col-span-1 ${inlineCls}`} placeholder="Seq" />
-      <input {...register("testCode")}      className={`col-span-2 ${inlineCls}`} placeholder="Test Code" />
-      <input {...register("parameterName")} className={`col-span-3 ${inlineCls}`} placeholder="Name" />
+      <input {...register("testCode")}      className={`col-span-3 ${inlineCls}`} placeholder="Test Code" />
+      <input {...register("parameterName")} className={`col-span-5 ${inlineCls}`} placeholder="Name" />
       <input {...register("outputMask")}    className={`col-span-2 ${inlineCls}`} placeholder="Output Mask" />
-      <input {...register("unit")}          className={`col-span-1 ${inlineCls}`} placeholder="Unit" />
-      <input {...register("lowerLimit")}    type="number" step="any" className={`col-span-1 ${inlineCls}`} placeholder="Low" />
-      <input {...register("upperLimit")}    type="number" step="any" className={`col-span-1 ${inlineCls}`} placeholder="High" />
       <div className="col-span-1 flex gap-1">
         <button type="submit" disabled={isSubmitting} className="bg-primary-600 rounded px-2 py-1 text-xs text-white">Save</button>
         <button type="button" onClick={() => { setEditing(false); reset(); }} className="dark:text-dark-300 rounded px-1 py-1 text-xs text-gray-500">✕</button>
@@ -307,12 +273,9 @@ function ParameterRow({ testFileId, param, onDelete }: {
   return (
     <div className="grid grid-cols-12 gap-1 items-center rounded-lg px-3 py-2 hover:bg-gray-50 dark:hover:bg-dark-700">
       <span className="col-span-1 text-xs text-gray-400 dark:text-dark-400 font-mono">{param.sequence}</span>
-      <span className="col-span-2 text-xs text-gray-500 dark:text-dark-400 font-mono">{param.testCode ?? "—"}</span>
-      <span className="col-span-3 text-sm dark:text-dark-200">{param.parameterName}</span>
+      <span className="col-span-3 text-xs text-gray-500 dark:text-dark-400 font-mono">{param.testCode ?? "—"}</span>
+      <span className="col-span-5 text-sm dark:text-dark-200">{param.parameterName}</span>
       <span className="col-span-2 text-xs text-gray-400 dark:text-dark-400 font-mono">{param.outputMask ?? "—"}</span>
-      <span className="col-span-1 text-xs text-gray-400 dark:text-dark-400">{param.unit ?? "—"}</span>
-      <span className="col-span-1 text-xs text-gray-400 dark:text-dark-400">{param.lowerLimit ?? "—"}</span>
-      <span className="col-span-1 text-xs text-gray-400 dark:text-dark-400">{param.upperLimit ?? "—"}</span>
       <div className="col-span-1 flex gap-1">
         <button onClick={() => setEditing(true)} className="rounded p-1 text-gray-400 hover:text-gray-700 dark:hover:text-dark-200">
           <PencilSquareIcon className="size-3.5" />
@@ -341,7 +304,7 @@ function ParameterSection({ file, onRefresh }: { file: TestFileDto; onRefresh: (
 
   const addParam = async (d: ParamForm) => {
     try {
-      const res = await testFileService.addParameter(file.id, d as ParameterPayload);
+      const res = await testFileService.addParameter(file.id, { ...d } as ParameterPayload);
       setParams(p => [...p, res.data.data].sort((a, b) => a.sequence - b.sequence));
       toast.success("Parameter added.");
       reset({ sequence: nextSequence + 10, outputMask: "999990.9" });
@@ -366,12 +329,9 @@ function ParameterSection({ file, onRefresh }: { file: TestFileDto; onRefresh: (
       {/* Column headers */}
       <div className="grid grid-cols-12 gap-1 border-b border-gray-100 pb-1 dark:border-dark-600 text-xs font-medium text-gray-400 uppercase tracking-wide px-3">
         <span className="col-span-1">Seq</span>
-        <span className="col-span-2">Test Code</span>
-        <span className="col-span-3">Parameter Name</span>
+        <span className="col-span-3">Test Code</span>
+        <span className="col-span-5">Parameter Name</span>
         <span className="col-span-2">Output Mask</span>
-        <span className="col-span-1">Unit</span>
-        <span className="col-span-1">Low</span>
-        <span className="col-span-1">High</span>
         <span className="col-span-1" />
       </div>
 
@@ -381,13 +341,10 @@ function ParameterSection({ file, onRefresh }: { file: TestFileDto; onRefresh: (
 
       {/* Add row */}
       <form onSubmit={handleSubmit(addParam)} className="grid grid-cols-12 gap-1 items-center px-3 pt-2">
-        <input {...register("sequence")}      type="number" className={`col-span-1 rounded-lg border border-dashed border-gray-300 px-2 py-1 text-sm dark:bg-dark-800 dark:border-dark-500 dark:text-dark-100`} placeholder="Seq" />
-        <input {...register("testCode")}      className={`col-span-2 rounded-lg border border-dashed border-gray-300 px-2 py-1 text-sm dark:bg-dark-800 dark:border-dark-500 dark:text-dark-100`} placeholder="Test Code" />
-        <input {...register("parameterName")} className={`col-span-3 rounded-lg border border-dashed border-gray-300 px-2 py-1 text-sm dark:bg-dark-800 dark:border-dark-500 dark:text-dark-100`} placeholder="+ Parameter name" />
-        <input {...register("outputMask")}    className={`col-span-2 rounded-lg border border-dashed border-gray-300 px-2 py-1 text-sm dark:bg-dark-800 dark:border-dark-500 dark:text-dark-100`} placeholder="999990.9" />
-        <input {...register("unit")}          className={`col-span-1 rounded-lg border border-dashed border-gray-300 px-2 py-1 text-sm dark:bg-dark-800 dark:border-dark-500 dark:text-dark-100`} placeholder="Unit" />
-        <input {...register("lowerLimit")}    type="number" step="any" className={`col-span-1 rounded-lg border border-dashed border-gray-300 px-2 py-1 text-sm dark:bg-dark-800 dark:border-dark-500 dark:text-dark-100`} placeholder="Low" />
-        <input {...register("upperLimit")}    type="number" step="any" className={`col-span-1 rounded-lg border border-dashed border-gray-300 px-2 py-1 text-sm dark:bg-dark-800 dark:border-dark-500 dark:text-dark-100`} placeholder="High" />
+        <input {...register("sequence")}      type="number" className="col-span-1 rounded-lg border border-dashed border-gray-300 px-2 py-1 text-sm dark:bg-dark-800 dark:border-dark-500 dark:text-dark-100" placeholder="Seq" />
+        <input {...register("testCode")}      className="col-span-3 rounded-lg border border-dashed border-gray-300 px-2 py-1 text-sm dark:bg-dark-800 dark:border-dark-500 dark:text-dark-100" placeholder="Test Code" />
+        <input {...register("parameterName")} className="col-span-5 rounded-lg border border-dashed border-gray-300 px-2 py-1 text-sm dark:bg-dark-800 dark:border-dark-500 dark:text-dark-100" placeholder="+ Parameter name" />
+        <input {...register("outputMask")}    className="col-span-2 rounded-lg border border-dashed border-gray-300 px-2 py-1 text-sm dark:bg-dark-800 dark:border-dark-500 dark:text-dark-100" placeholder="999990.9" />
         <button type="submit" disabled={isSubmitting}
           className="col-span-1 bg-primary-600 hover:bg-primary-700 flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-xs text-white">
           <PlusIcon className="size-3" />Add

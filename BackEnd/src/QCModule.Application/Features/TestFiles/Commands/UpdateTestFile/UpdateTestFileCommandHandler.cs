@@ -42,10 +42,7 @@ public class UpdateTestFileCommandHandler(
                 ParameterName = p.ParameterName.Trim(),
                 TestCode      = p.TestCode?.Trim(),
                 OutputMask    = p.OutputMask?.Trim(),
-                Sequence      = p.Sequence,
-                Unit          = p.Unit?.Trim(),
-                LowerLimit    = p.LowerLimit,
-                UpperLimit    = p.UpperLimit
+                Sequence      = p.Sequence
             };
             await paramRepo.AddAsync(param, cancellationToken);
             paramList.Add(param);

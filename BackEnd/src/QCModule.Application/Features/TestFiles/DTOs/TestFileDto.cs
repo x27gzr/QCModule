@@ -4,10 +4,7 @@ public record ParameterInput(
     string  ParameterName,
     string? TestCode,
     string? OutputMask,
-    int     Sequence,
-    string? Unit,
-    double? LowerLimit,
-    double? UpperLimit
+    int     Sequence
 );
 
 public record TestFileParameterDto(

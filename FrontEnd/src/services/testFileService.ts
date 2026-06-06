@@ -40,9 +40,6 @@ export interface ParameterPayload {
   testCode?: string;
   outputMask?: string;
   sequence: number;
-  unit?: string;
-  lowerLimit?: number;
-  upperLimit?: number;
 }
 
 const testFileService = {
