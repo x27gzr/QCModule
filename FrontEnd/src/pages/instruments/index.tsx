@@ -77,7 +77,7 @@ export default function InstrumentsPage() {
           <input
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search name, code, manufacturer…"
+            placeholder="Search name or code…"
             className="dark:bg-dark-800 dark:text-dark-100 dark:border-dark-600 w-72 rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
           />
         </div>
@@ -103,7 +103,7 @@ export default function InstrumentsPage() {
             <tr className="dark:bg-dark-700 dark:text-dark-300 border-gray-150 dark:border-dark-600 border-b bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
               <th className="px-4 py-3">Instrument</th>
               <th className="px-4 py-3">Code</th>
-              <th className="px-4 py-3">Manufacturer</th>
+              <th className="px-4 py-3">Test File</th>
               <th className="px-4 py-3">Status</th>
               {isAdmin && <th className="px-4 py-3 text-right">Actions</th>}
             </tr>
@@ -140,7 +140,7 @@ export default function InstrumentsPage() {
                   </span>
                 </td>
                 <td className="dark:text-dark-300 px-4 py-3 text-gray-500">
-                  {item.manufacturer ?? <span className="italic text-gray-300 dark:text-dark-500">—</span>}
+                  {item.testFileName}
                 </td>
                 <td className="px-4 py-3">
                   {item.isActive

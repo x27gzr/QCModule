@@ -13,5 +13,8 @@ public class CreateInstrumentCommandValidator : AbstractValidator<CreateInstrume
         RuleFor(x => x.Code)
             .NotEmpty().WithMessage("Instrument code is required.")
             .MaximumLength(50);
+
+        RuleFor(x => x.TestFileId)
+            .NotEmpty().WithMessage("Test File is required.");
     }
 }

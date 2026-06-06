@@ -7,23 +7,28 @@ using QCModule.Domain.Interfaces;
 
 namespace QCModule.Application.Features.Instruments.Commands.CreateInstrument;
 
-public class CreateInstrumentCommandHandler(IRepository<Instrument> repo, IUnitOfWork unitOfWork)
+public class CreateInstrumentCommandHandler(
+    IRepository<Instrument> repo,
+    IRepository<TestFile>   testFileRepo,
+    IUnitOfWork             unitOfWork)
     : IRequestHandler<CreateInstrumentCommand, Result<InstrumentDto>>
 {
     public async Task<Result<InstrumentDto>> Handle(CreateInstrumentCommand request, CancellationToken cancellationToken)
     {
+        var testFiles = await testFileRepo.FindAsync(t => t.Id == request.TestFileId, cancellationToken);
+        var testFile  = testFiles.FirstOrDefault()
+            ?? throw new NotFoundException("TestFile", request.TestFileId);
+
         var existing = await repo.FindAsync(i => i.Code == request.Code.Trim().ToUpper(), cancellationToken);
         if (existing.Any())
             throw new ConflictException($"Instrument with code '{request.Code}' already exists.");
 
         var instrument = new Instrument
         {
-            Name         = request.Name.Trim(),
-            Code         = request.Code.Trim().ToUpper(),
-            Manufacturer = request.Manufacturer?.Trim(),
-            Model        = request.Model?.Trim(),
-            SerialNumber = request.SerialNumber?.Trim(),
-            IsActive     = true
+            Name       = request.Name.Trim(),
+            Code       = request.Code.Trim().ToUpper(),
+            TestFileId = request.TestFileId,
+            IsActive   = request.IsActive
         };
 
         await repo.AddAsync(instrument, cancellationToken);
@@ -31,8 +36,7 @@ public class CreateInstrumentCommandHandler(IRepository<Instrument> repo, IUnitO
 
         return Result<InstrumentDto>.Success(
             new InstrumentDto(instrument.Id, instrument.Name, instrument.Code,
-                instrument.Manufacturer, instrument.Model, instrument.SerialNumber,
-                instrument.IsActive, instrument.CreatedAt),
+                instrument.IsActive, instrument.TestFileId, testFile.Name, instrument.CreatedAt),
             "Instrument created successfully.");
     }
 }

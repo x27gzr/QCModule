@@ -131,6 +131,15 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 });
         });
 
+        // ── Instrument → TestFile ─────────────────────────────────────────────
+        modelBuilder.Entity<Instrument>(e =>
+        {
+            e.HasOne(i => i.TestFile)
+             .WithMany()
+             .HasForeignKey(i => i.TestFileId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
         // ── QCResult approval relationships (3 FKs to User) ───────────────────
         modelBuilder.Entity<QCResult>(e =>
         {

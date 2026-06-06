@@ -4,10 +4,9 @@ export interface InstrumentDto {
   id: string;
   name: string;
   code: string;
-  manufacturer: string | null;
-  model: string | null;
-  serialNumber: string | null;
   isActive: boolean;
+  testFileId: string;
+  testFileName: string;
   createdAt: string;
 }
 
@@ -15,8 +14,9 @@ export interface InstrumentSummaryDto {
   id: string;
   name: string;
   code: string;
-  manufacturer: string | null;
   isActive: boolean;
+  testFileId: string;
+  testFileName: string;
 }
 
 export interface PaginatedResult<T> {
@@ -32,9 +32,7 @@ export interface PaginatedResult<T> {
 export interface InstrumentPayload {
   name: string;
   code: string;
-  manufacturer?: string;
-  model?: string;
-  serialNumber?: string;
+  testFileId: string;
 }
 
 const instrumentService = {

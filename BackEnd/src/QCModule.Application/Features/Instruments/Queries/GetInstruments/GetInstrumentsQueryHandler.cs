@@ -6,21 +6,21 @@ using QCModule.Domain.Interfaces;
 
 namespace QCModule.Application.Features.Instruments.Queries.GetInstruments;
 
-public class GetInstrumentsQueryHandler(IRepository<Instrument> repo)
+public class GetInstrumentsQueryHandler(IRepository<Instrument> repo, IRepository<TestFile> testFileRepo)
     : IRequestHandler<GetInstrumentsQuery, Result<PaginatedResult<InstrumentSummaryDto>>>
 {
     public async Task<Result<PaginatedResult<InstrumentSummaryDto>>> Handle(
         GetInstrumentsQuery request, CancellationToken cancellationToken)
     {
-        var all   = await repo.GetAllAsync(cancellationToken);
-        var query = all.AsEnumerable();
+        var all        = await repo.GetAllAsync(cancellationToken);
+        var testFiles  = (await testFileRepo.GetAllAsync(cancellationToken)).ToDictionary(t => t.Id, t => t.Name);
+        var query      = all.AsEnumerable();
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var term = request.Search.Trim().ToLower();
             query = query.Where(i => i.Name.ToLower().Contains(term)
-                                  || i.Code.ToLower().Contains(term)
-                                  || (i.Manufacturer ?? "").ToLower().Contains(term));
+                                  || i.Code.ToLower().Contains(term));
         }
 
         if (request.IsActive.HasValue)
@@ -34,7 +34,10 @@ public class GetInstrumentsQueryHandler(IRepository<Instrument> repo)
         var items = ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(i => new InstrumentSummaryDto(i.Id, i.Name, i.Code, i.Manufacturer, i.IsActive))
+            .Select(i => new InstrumentSummaryDto(
+                i.Id, i.Name, i.Code, i.IsActive,
+                i.TestFileId,
+                testFiles.TryGetValue(i.TestFileId, out var tfName) ? tfName : "—"))
             .ToList();
 
         return Result<PaginatedResult<InstrumentSummaryDto>>.Success(new PaginatedResult<InstrumentSummaryDto>

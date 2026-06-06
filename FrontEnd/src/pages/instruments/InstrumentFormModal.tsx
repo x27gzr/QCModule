@@ -1,15 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { InstrumentDto } from "@/services/instrumentService";
+import testFileService, { type TestFileSummaryDto } from "@/services/testFileService";
 
 const schema = z.object({
-  name:         z.string().min(1, "Name is required").max(100),
-  code:         z.string().min(1, "Code is required").max(50),
-  manufacturer: z.string().optional(),
-  model:        z.string().optional(),
-  serialNumber: z.string().optional(),
+  name:       z.string().min(1, "Name is required").max(100),
+  code:       z.string().min(1, "Code is required").max(50),
+  testFileId: z.string().uuid("Test File is required"),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -34,17 +33,23 @@ const inputCls = "dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 w-ful
 export default function InstrumentFormModal({ mode, item, onSave, onClose }: Props) {
   const isEdit = mode === "edit";
 
+  const [testFiles, setTestFiles] = useState<TestFileSummaryDto[]>([]);
+
   const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } =
     useForm<FormValues>({ resolver: zodResolver(schema) });
 
   useEffect(() => {
+    testFileService.getAll({ isActive: true, pageSize: 200 }).then(res => {
+      setTestFiles(res.data.data.items);
+    });
+  }, []);
+
+  useEffect(() => {
     if (isEdit && item) {
       reset({
-        name:         item.name,
-        code:         item.code,
-        manufacturer: item.manufacturer ?? "",
-        model:        item.model ?? "",
-        serialNumber: item.serialNumber ?? "",
+        name:       item.name,
+        code:       item.code,
+        testFileId: item.testFileId,
       });
     }
   }, [item, isEdit, reset]);
@@ -75,18 +80,16 @@ export default function InstrumentFormModal({ mode, item, onSave, onClose }: Pro
             </Field>
           </div>
 
-          <Field label="Manufacturer" error={errors.manufacturer?.message}>
-            <input {...register("manufacturer")} className={inputCls} placeholder="e.g. Roche" />
+          <Field label="Test File *" error={errors.testFileId?.message}>
+            <select {...register("testFileId")} className={inputCls}>
+              <option value="">— Select Test File —</option>
+              {testFiles.map(tf => (
+                <option key={tf.id} value={tf.id}>
+                  {tf.name} ({tf.code})
+                </option>
+              ))}
+            </select>
           </Field>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Model" error={errors.model?.message}>
-              <input {...register("model")} className={inputCls} placeholder="e.g. c702" />
-            </Field>
-            <Field label="Serial Number" error={errors.serialNumber?.message}>
-              <input {...register("serialNumber")} className={inputCls} placeholder="e.g. SN-123456" />
-            </Field>
-          </div>
 
           {errors.root && (
             <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">

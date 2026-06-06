@@ -1,20 +1,20 @@
 namespace QCModule.Application.Features.Instruments.DTOs;
 
 public record InstrumentDto(
-    Guid    Id,
-    string  Name,
-    string  Code,
-    string? Manufacturer,
-    string? Model,
-    string? SerialNumber,
-    bool    IsActive,
+    Guid     Id,
+    string   Name,
+    string   Code,
+    bool     IsActive,
+    Guid     TestFileId,
+    string   TestFileName,
     DateTime CreatedAt
 );
 
 public record InstrumentSummaryDto(
-    Guid    Id,
-    string  Name,
-    string  Code,
-    string? Manufacturer,
-    bool    IsActive
+    Guid   Id,
+    string Name,
+    string Code,
+    bool   IsActive,
+    Guid   TestFileId,
+    string TestFileName
 );
