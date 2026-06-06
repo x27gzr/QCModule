@@ -54,13 +54,17 @@ public class TestFilesController(IMediator mediator) : ControllerBase
     [Authorize(Policy = Permissions.Instruments.Manage)]
     public async Task<ActionResult<Result<TestFileParameterDto>>> AddParameter(
         Guid id, [FromBody] AddParameterRequest body, CancellationToken ct)
-        => Ok(await mediator.Send(new AddParameterCommand(id, body.ParameterName, body.Unit, body.LowerLimit, body.UpperLimit), ct));
+        => Ok(await mediator.Send(new AddParameterCommand(
+            id, body.ParameterName, body.TestCode, body.OutputMask, body.Sequence,
+            body.Unit, body.LowerLimit, body.UpperLimit), ct));
 
     [HttpPut("{id:guid}/parameters/{parameterId:guid}")]
     [Authorize(Policy = Permissions.Instruments.Manage)]
     public async Task<ActionResult<Result<TestFileParameterDto>>> UpdateParameter(
         Guid id, Guid parameterId, [FromBody] AddParameterRequest body, CancellationToken ct)
-        => Ok(await mediator.Send(new UpdateParameterCommand(parameterId, id, body.ParameterName, body.Unit, body.LowerLimit, body.UpperLimit), ct));
+        => Ok(await mediator.Send(new UpdateParameterCommand(
+            parameterId, id, body.ParameterName, body.TestCode, body.OutputMask, body.Sequence,
+            body.Unit, body.LowerLimit, body.UpperLimit), ct));
 
     [HttpDelete("{id:guid}/parameters/{parameterId:guid}")]
     [Authorize(Policy = Permissions.Instruments.Manage)]
@@ -71,4 +75,12 @@ public class TestFilesController(IMediator mediator) : ControllerBase
     }
 }
 
-public record AddParameterRequest(string ParameterName, string? Unit, double? LowerLimit, double? UpperLimit);
+public record AddParameterRequest(
+    string  ParameterName,
+    string? TestCode,
+    string? OutputMask,
+    int     Sequence,
+    string? Unit,
+    double? LowerLimit,
+    double? UpperLimit
+);

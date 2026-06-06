@@ -20,8 +20,8 @@ public class CreateTestFileCommandHandler(IRepository<TestFile> repo, IUnitOfWor
         {
             Name     = request.Name.Trim(),
             Code     = request.Code.Trim().ToUpper(),
+            Type     = request.Type.Trim(),
             Unit     = request.Unit?.Trim(),
-            Category = request.Category?.Trim(),
             IsActive = true
         };
 
@@ -29,7 +29,7 @@ public class CreateTestFileCommandHandler(IRepository<TestFile> repo, IUnitOfWor
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result<TestFileDto>.Success(
-            new TestFileDto(file.Id, file.Name, file.Code, file.Unit, file.Category, file.IsActive, [], file.CreatedAt),
+            new TestFileDto(file.Id, file.Name, file.Code, file.Type, file.Unit, file.IsActive, [], file.CreatedAt),
             "Test file created successfully.");
     }
 }

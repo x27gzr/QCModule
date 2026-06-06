@@ -7,6 +7,6 @@ namespace QCModule.Application.Features.TestFiles.Commands.CreateTestFile;
 public record CreateTestFileCommand(
     string  Name,
     string  Code,
-    string? Unit,
-    string? Category
+    string  Type,
+    string? Unit
 ) : IRequest<Result<TestFileDto>>;

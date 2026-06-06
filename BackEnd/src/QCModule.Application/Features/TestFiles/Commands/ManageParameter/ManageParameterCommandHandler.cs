@@ -22,6 +22,9 @@ public class AddParameterCommandHandler(
         {
             TestFileId    = request.TestFileId,
             ParameterName = request.ParameterName.Trim(),
+            TestCode      = request.TestCode?.Trim(),
+            OutputMask    = request.OutputMask?.Trim(),
+            Sequence      = request.Sequence,
             Unit          = request.Unit?.Trim(),
             LowerLimit    = request.LowerLimit,
             UpperLimit    = request.UpperLimit
@@ -31,7 +34,8 @@ public class AddParameterCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result<TestFileParameterDto>.Success(
-            new TestFileParameterDto(param.Id, param.ParameterName, param.Unit, param.LowerLimit, param.UpperLimit),
+            new TestFileParameterDto(param.Id, param.ParameterName, param.TestCode, param.OutputMask,
+                param.Sequence, param.Unit, param.LowerLimit, param.UpperLimit),
             "Parameter added.");
     }
 }
@@ -45,6 +49,9 @@ public class UpdateParameterCommandHandler(IRepository<TestFileParameter> paramR
         var param = items.FirstOrDefault() ?? throw new NotFoundException("Parameter", request.ParameterId);
 
         param.ParameterName = request.ParameterName.Trim();
+        param.TestCode      = request.TestCode?.Trim();
+        param.OutputMask    = request.OutputMask?.Trim();
+        param.Sequence      = request.Sequence;
         param.Unit          = request.Unit?.Trim();
         param.LowerLimit    = request.LowerLimit;
         param.UpperLimit    = request.UpperLimit;
@@ -53,7 +60,8 @@ public class UpdateParameterCommandHandler(IRepository<TestFileParameter> paramR
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result<TestFileParameterDto>.Success(
-            new TestFileParameterDto(param.Id, param.ParameterName, param.Unit, param.LowerLimit, param.UpperLimit));
+            new TestFileParameterDto(param.Id, param.ParameterName, param.TestCode, param.OutputMask,
+                param.Sequence, param.Unit, param.LowerLimit, param.UpperLimit));
     }
 }
 

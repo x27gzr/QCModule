@@ -22,20 +22,22 @@ public class UpdateTestFileCommandHandler(
         var dup  = await repo.FindAsync(f => f.Code == code && f.Id != request.Id, cancellationToken);
         if (dup.Any()) throw new ConflictException($"Test file with code '{code}' already exists.");
 
-        file.Name     = request.Name.Trim();
-        file.Code     = code;
-        file.Unit     = request.Unit?.Trim();
-        file.Category = request.Category?.Trim();
+        file.Name = request.Name.Trim();
+        file.Code = code;
+        file.Type = request.Type.Trim();
+        file.Unit = request.Unit?.Trim();
 
         await repo.UpdateAsync(file, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var parameters = await paramRepo.FindAsync(p => p.TestFileId == file.Id, cancellationToken);
-        var paramDtos  = parameters.OrderBy(p => p.ParameterName)
-                                   .Select(p => new TestFileParameterDto(p.Id, p.ParameterName, p.Unit, p.LowerLimit, p.UpperLimit));
+        var paramDtos  = parameters.OrderBy(p => p.Sequence).ThenBy(p => p.ParameterName)
+                                   .Select(p => new TestFileParameterDto(
+                                       p.Id, p.ParameterName, p.TestCode, p.OutputMask, p.Sequence,
+                                       p.Unit, p.LowerLimit, p.UpperLimit));
 
         return Result<TestFileDto>.Success(
-            new TestFileDto(file.Id, file.Name, file.Code, file.Unit, file.Category, file.IsActive, paramDtos, file.CreatedAt),
+            new TestFileDto(file.Id, file.Name, file.Code, file.Type, file.Unit, file.IsActive, paramDtos, file.CreatedAt),
             "Test file updated successfully.");
     }
 }

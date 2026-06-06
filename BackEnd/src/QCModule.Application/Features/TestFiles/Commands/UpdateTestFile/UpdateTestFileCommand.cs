@@ -4,5 +4,5 @@ using QCModule.Application.Features.TestFiles.DTOs;
 
 namespace QCModule.Application.Features.TestFiles.Commands.UpdateTestFile;
 
-public record UpdateTestFileCommand(Guid Id, string Name, string Code, string? Unit, string? Category)
+public record UpdateTestFileCommand(Guid Id, string Name, string Code, string Type, string? Unit)
     : IRequest<Result<TestFileDto>>;

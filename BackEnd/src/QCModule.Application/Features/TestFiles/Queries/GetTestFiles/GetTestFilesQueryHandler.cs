@@ -14,7 +14,7 @@ public class GetTestFilesQueryHandler(
     public async Task<Result<PaginatedResult<TestFileSummaryDto>>> Handle(
         GetTestFilesQuery request, CancellationToken cancellationToken)
     {
-        var files  = await testFileRepo.GetAllAsync(cancellationToken);
+        var files   = await testFileRepo.GetAllAsync(cancellationToken);
         var params_ = await paramRepo.GetAllAsync(cancellationToken);
         var countMap = params_.GroupBy(p => p.TestFileId)
                                .ToDictionary(g => g.Key, g => g.Count());
@@ -25,20 +25,20 @@ public class GetTestFilesQueryHandler(
             var term = request.Search.Trim().ToLower();
             query = query.Where(f => f.Name.ToLower().Contains(term)
                                   || f.Code.ToLower().Contains(term)
-                                  || (f.Category ?? "").ToLower().Contains(term));
+                                  || f.Type.ToLower().Contains(term));
         }
         if (request.IsActive.HasValue)
             query = query.Where(f => f.IsActive == request.IsActive.Value);
 
         var ordered  = query.OrderBy(f => f.Name).ToList();
         var total    = ordered.Count;
-        var pageSize = Math.Clamp(request.PageSize, 1, 50);
+        var pageSize = Math.Clamp(request.PageSize, 1, 200);
         var page     = Math.Max(request.Page, 1);
 
         var items = ordered
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(f => new TestFileSummaryDto(
-                f.Id, f.Name, f.Code, f.Category, f.IsActive,
+                f.Id, f.Name, f.Code, f.Type, f.IsActive,
                 countMap.GetValueOrDefault(f.Id, 0)))
             .ToList();
 

@@ -19,10 +19,12 @@ public class GetTestFileByIdQueryHandler(
             ?? throw new NotFoundException("Test File", request.Id);
 
         var parameters = await paramRepo.FindAsync(p => p.TestFileId == request.Id, cancellationToken);
-        var paramDtos  = parameters.OrderBy(p => p.ParameterName)
-                                   .Select(p => new TestFileParameterDto(p.Id, p.ParameterName, p.Unit, p.LowerLimit, p.UpperLimit));
+        var paramDtos  = parameters.OrderBy(p => p.Sequence).ThenBy(p => p.ParameterName)
+                                   .Select(p => new TestFileParameterDto(
+                                       p.Id, p.ParameterName, p.TestCode, p.OutputMask, p.Sequence,
+                                       p.Unit, p.LowerLimit, p.UpperLimit));
 
         return Result<TestFileDto>.Success(new TestFileDto(
-            file.Id, file.Name, file.Code, file.Unit, file.Category, file.IsActive, paramDtos, file.CreatedAt));
+            file.Id, file.Name, file.Code, file.Type, file.Unit, file.IsActive, paramDtos, file.CreatedAt));
     }
 }

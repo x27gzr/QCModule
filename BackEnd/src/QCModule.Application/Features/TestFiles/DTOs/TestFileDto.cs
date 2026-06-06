@@ -3,27 +3,30 @@ namespace QCModule.Application.Features.TestFiles.DTOs;
 public record TestFileParameterDto(
     Guid    Id,
     string  ParameterName,
+    string? TestCode,
+    string? OutputMask,
+    int     Sequence,
     string? Unit,
     double? LowerLimit,
     double? UpperLimit
 );
 
 public record TestFileDto(
-    Guid                             Id,
-    string                           Name,
-    string                           Code,
-    string?                          Unit,
-    string?                          Category,
-    bool                             IsActive,
+    Guid                              Id,
+    string                            Name,
+    string                            Code,
+    string                            Type,
+    string?                           Unit,
+    bool                              IsActive,
     IEnumerable<TestFileParameterDto> Parameters,
-    DateTime                         CreatedAt
+    DateTime                          CreatedAt
 );
 
 public record TestFileSummaryDto(
     Guid    Id,
     string  Name,
     string  Code,
-    string? Category,
+    string  Type,
     bool    IsActive,
     int     ParameterCount
 );

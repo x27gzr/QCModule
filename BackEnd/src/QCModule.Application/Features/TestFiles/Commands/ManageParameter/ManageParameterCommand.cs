@@ -7,6 +7,9 @@ namespace QCModule.Application.Features.TestFiles.Commands.ManageParameter;
 public record AddParameterCommand(
     Guid    TestFileId,
     string  ParameterName,
+    string? TestCode,
+    string? OutputMask,
+    int     Sequence,
     string? Unit,
     double? LowerLimit,
     double? UpperLimit
@@ -16,6 +19,9 @@ public record UpdateParameterCommand(
     Guid    ParameterId,
     Guid    TestFileId,
     string  ParameterName,
+    string? TestCode,
+    string? OutputMask,
+    int     Sequence,
     string? Unit,
     double? LowerLimit,
     double? UpperLimit
