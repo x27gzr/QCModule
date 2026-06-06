@@ -11,6 +11,7 @@ BackEnd/**/*.log
 # appsettings.json is committed but with placeholder values only
 BackEnd/**/appsettings.Production.json
 BackEnd/**/appsettings.Staging.json
+BackEnd/**/wwwroot/
 
 # EF Core migrations bundle
 BackEnd/**/efbundle

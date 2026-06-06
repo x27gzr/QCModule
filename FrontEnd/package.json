@@ -28,6 +28,7 @@
     "react-i18next": "^16.5.1",
     "react-router-dom": "^7.12.0",
     "simplebar-react": "^3.3.2",
+    "sonner": "^2.0.7",
     "tailwindcss": "^4.1.18",
     "vite-plugin-svgr": "^4.5.0",
     "zod": "^4.4.3"
