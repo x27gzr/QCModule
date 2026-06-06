@@ -125,7 +125,7 @@ export default function LeveyJenningsChart({ data, westgardRules, maxPoints, sho
   const sdLines = [-3, -2, -1, 0, 1, 2, 3];
 
   return (
-    <div className="w-full space-y-3">
+    <div className={fillHeight ? "h-full w-full" : "w-full space-y-3"}>
       <div className={fillHeight ? "h-full overflow-hidden" : "overflow-x-auto"}>
         <svg viewBox={`0 0 ${W} ${H}`}
           style={fillHeight ? { width: '100%', height: '100%' } : { minWidth: 480 }}
