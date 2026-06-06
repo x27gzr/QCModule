@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowPathIcon, ShieldCheckIcon, CheckCircleIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { toast } from "sonner";
 import dayjs from "dayjs";
 import qcResultService, { type QCResultSummaryDto, type AuthorisationSummaryDto } from "@/services/qcResultService";
+import { getErrorMessage } from "@/utils/apiError";
 
 function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {
   return (
@@ -57,8 +59,13 @@ export default function DoctorAuthorisationPage() {
 
   const authoriseOne = async (r: QCResultSummaryDto) => {
     setBusy(true);
-    try { await qcResultService.doctorAuthorise(r.id); await load(); }
-    finally { setBusy(false); }
+    try {
+      await qcResultService.doctorAuthorise(r.id);
+      toast.success("Result authorised.");
+      await load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally { setBusy(false); }
   };
 
   const batchAuthorise = async () => {
@@ -66,8 +73,10 @@ export default function DoctorAuthorisationPage() {
     setBusy(true);
     try {
       const res = await qcResultService.batchAuthorise([...selected]);
+      toast.success(res.data.message ?? `${selected.size} results authorised.`);
       await load();
-      window.alert(res.data.message);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     } finally { setBusy(false); }
   };
 

@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import type { InstrumentDto } from "@/services/instrumentService";
 import testFileService, { type TestFileSummaryDto } from "@/services/testFileService";
+import { getErrorMessage } from "@/utils/apiError";
 
 const schema = z.object({
   name:       z.string().min(1, "Name is required").max(100),
@@ -57,9 +59,12 @@ export default function InstrumentFormModal({ mode, item, onSave, onClose }: Pro
   const onSubmit = async (data: FormValues) => {
     try {
       await onSave(data);
+      toast.success(isEdit ? "Instrument updated." : "Instrument created.");
       onClose();
-    } catch (err: any) {
-      setError("root", { message: err?.message ?? "An error occurred." });
+    } catch (err) {
+      const msg = getErrorMessage(err);
+      setError("root", { message: msg });
+      toast.error(msg);
     }
   };
 

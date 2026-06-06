@@ -1,4 +1,5 @@
 import { BrowserRouter } from "react-router-dom";
+import { Toaster } from "sonner";
 import AppRoutes from "@/routes";
 import { ThemeProvider } from "./contexts/theme/Provider";
 import { LocaleProvider } from "./contexts/locale/Provider";
@@ -11,6 +12,7 @@ function App() {
         <LocaleProvider>
           <AuthProvider>
             <AppRoutes />
+            <Toaster richColors position="top-right" duration={4000} />
           </AuthProvider>
         </LocaleProvider>
       </ThemeProvider>

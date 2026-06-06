@@ -4,10 +4,12 @@ import {
   TrashIcon, ArrowPathIcon, CheckCircleIcon, XCircleIcon,
   BeakerIcon,
 } from "@heroicons/react/24/outline";
+import { toast } from "sonner";
 import instrumentService, { type InstrumentSummaryDto, type InstrumentDto } from "@/services/instrumentService";
 import InstrumentFormModal from "./InstrumentFormModal";
 import DeleteModal from "@/pages/users/DeleteModal";
 import { useAuth } from "@/contexts/auth/context";
+import { getErrorMessage } from "@/utils/apiError";
 
 export default function InstrumentsPage() {
   const { user: me } = useAuth();
@@ -56,14 +58,24 @@ export default function InstrumentsPage() {
   };
 
   const handleDelete = async () => {
-    await instrumentService.delete(target!.id);
-    setModal(null);
-    load();
+    try {
+      await instrumentService.delete(target!.id);
+      setModal(null);
+      toast.success("Instrument deleted.");
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
   const handleToggle = async (item: InstrumentSummaryDto) => {
-    await instrumentService.toggleActive(item.id);
-    load();
+    try {
+      await instrumentService.toggleActive(item.id);
+      toast.success(item.isActive ? "Instrument deactivated." : "Instrument activated.");
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
   const totalPages = Math.ceil(total / pageSize);

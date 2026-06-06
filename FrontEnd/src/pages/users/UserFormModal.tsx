@@ -2,8 +2,10 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import type { RoleDto } from "@/services/roleService";
 import type { UserDto } from "@/services/userService";
+import { getErrorMessage } from "@/utils/apiError";
 
 const createSchema = z.object({
   name:     z.string().min(1, "Name is required"),
@@ -47,9 +49,12 @@ export default function UserFormModal({ mode, user, roles, onSave, onClose }: Pr
   const onSubmit = async (data: CreateValues | EditValues) => {
     try {
       await onSave(data);
+      toast.success(isEdit ? "User updated." : "User created.");
       onClose();
-    } catch (err: any) {
-      setError("root", { message: err?.message ?? "An error occurred." });
+    } catch (err) {
+      const msg = getErrorMessage(err);
+      setError("root", { message: msg });
+      toast.error(msg);
     }
   };
 

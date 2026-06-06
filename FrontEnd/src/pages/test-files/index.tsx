@@ -3,9 +3,11 @@ import { PlusIcon, MagnifyingGlassIcon, PencilSquareIcon, TrashIcon, ArrowPathIc
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import testFileService, { type TestFileSummaryDto, type TestFileDto, type TestFileParameterDto } from "@/services/testFileService";
 import DeleteModal from "@/pages/users/DeleteModal";
 import { useAuth } from "@/contexts/auth/context";
+import { getErrorMessage } from "@/utils/apiError";
 
 const fileSchema = z.object({ name: z.string().min(1), code: z.string().min(1), unit: z.string().optional(), category: z.string().optional() });
 const paramSchema = z.object({ parameterName: z.string().min(1, "Name required"), unit: z.string().optional(), lowerLimit: z.preprocess(v => v === "" ? undefined : Number(v), z.number().optional()), upperLimit: z.preprocess(v => v === "" ? undefined : Number(v), z.number().optional()) });
@@ -18,7 +20,17 @@ const inputCls = "dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 w-ful
 function FileFormModal({ item, onSave, onClose }: { item?: TestFileDto; onSave: (d: FileForm) => Promise<void>; onClose: () => void }) {
   const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm<FileForm>({ resolver: zodResolver(fileSchema) });
   useEffect(() => { if (item) reset({ name: item.name, code: item.code, unit: item.unit ?? "", category: item.category ?? "" }); }, [item, reset]);
-  const onSubmit = async (d: FileForm) => { try { await onSave(d); onClose(); } catch (e: any) { setError("root", { message: e?.message }); } };
+  const onSubmit = async (d: FileForm) => {
+    try {
+      await onSave(d);
+      toast.success(item ? "Test file updated." : "Test file created.");
+      onClose();
+    } catch (err) {
+      const msg = getErrorMessage(err);
+      setError("root", { message: msg });
+      toast.error(msg);
+    }
+  };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="dark:bg-dark-800 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
@@ -46,7 +58,15 @@ function FileFormModal({ item, onSave, onClose }: { item?: TestFileDto; onSave: 
 function ParameterRow({ testFileId, param, onDelete }: { testFileId: string; param: TestFileParameterDto; onDelete: () => void }) {
   const [editing, setEditing] = useState(false);
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<ParamForm>({ resolver: zodResolver(paramSchema), defaultValues: { parameterName: param.parameterName, unit: param.unit ?? "", lowerLimit: param.lowerLimit ?? undefined, upperLimit: param.upperLimit ?? undefined } });
-  const save = async (d: ParamForm) => { await testFileService.updateParameter(testFileId, param.id, d); setEditing(false); };
+  const save = async (d: ParamForm) => {
+    try {
+      await testFileService.updateParameter(testFileId, param.id, d);
+      toast.success("Parameter updated.");
+      setEditing(false);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
   if (editing) return (
     <form onSubmit={handleSubmit(save)} className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 dark:bg-dark-700">
       <input {...register("parameterName")} className="flex-1 rounded border border-gray-200 px-2 py-1 text-sm dark:bg-dark-800 dark:border-dark-600 dark:text-dark-100" placeholder="Parameter name" />
@@ -72,13 +92,24 @@ function ParameterSection({ file, onRefresh }: { file: TestFileDto; onRefresh: (
   const [params, setParams] = useState<TestFileParameterDto[]>(file.parameters);
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<ParamForm>({ resolver: zodResolver(paramSchema) });
   const addParam = async (d: ParamForm) => {
-    const res = await testFileService.addParameter(file.id, d);
-    setParams(p => [...p, res.data.data]); reset();
+    try {
+      const res = await testFileService.addParameter(file.id, d);
+      setParams(p => [...p, res.data.data]);
+      toast.success("Parameter added.");
+      reset();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
   const deleteParam = async (paramId: string) => {
-    await testFileService.deleteParameter(file.id, paramId);
-    setParams(p => p.filter(x => x.id !== paramId));
-    onRefresh();
+    try {
+      await testFileService.deleteParameter(file.id, paramId);
+      setParams(p => p.filter(x => x.id !== paramId));
+      toast.success("Parameter deleted.");
+      onRefresh();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
   return (
     <div className="mt-3 space-y-1">
@@ -141,7 +172,16 @@ export default function TestFilesPage() {
 
   const handleCreate = async (d: any) => { await testFileService.create(d); load(); };
   const handleEdit   = async (d: any) => { await testFileService.update(target!.id, d); load(); };
-  const handleDelete = async () => { await testFileService.delete(target!.id); setModal(null); load(); };
+  const handleDelete = async () => {
+    try {
+      await testFileService.delete(target!.id);
+      setModal(null);
+      toast.success("Test file deleted.");
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
 
   const totalPages = Math.ceil(total / pageSize);
 

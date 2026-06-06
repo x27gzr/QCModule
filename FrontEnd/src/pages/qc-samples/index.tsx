@@ -4,6 +4,7 @@ import {
   TrashIcon, ArrowPathIcon, ClipboardDocumentListIcon,
   ExclamationTriangleIcon, AdjustmentsHorizontalIcon,
 } from "@heroicons/react/24/outline";
+import { toast } from "sonner";
 import dayjs from "dayjs";
 import qcSampleService, { type QCSampleSummaryDto, type QCSampleDto } from "@/services/qcSampleService";
 import instrumentService, { type InstrumentSummaryDto } from "@/services/instrumentService";
@@ -11,6 +12,7 @@ import QCSampleFormModal from "./QCSampleFormModal";
 import QCSampleTargetsModal from "./QCSampleTargetsModal";
 import DeleteModal from "@/pages/users/DeleteModal";
 import { useAuth } from "@/contexts/auth/context";
+import { getErrorMessage } from "@/utils/apiError";
 
 const LEVEL_COLORS: Record<string, string> = {
   "Level 1": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
@@ -73,7 +75,16 @@ export default function QCSamplesPage() {
 
   const handleCreate = async (data: any) => { await qcSampleService.create(data); load(); };
   const handleEdit   = async (data: any) => { await qcSampleService.update(target!.id, data); load(); };
-  const handleDelete = async () => { await qcSampleService.delete(target!.id); setModal(null); load(); };
+  const handleDelete = async () => {
+    try {
+      await qcSampleService.delete(target!.id);
+      setModal(null);
+      toast.success("QC Sample deleted.");
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
 
   const totalPages = Math.ceil(total / pageSize);
 

@@ -3,11 +3,13 @@ import { PlusIcon, ArrowPathIcon, ChartBarIcon, CheckCircleIcon, XCircleIcon, Ex
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import dayjs from "dayjs";
 import qcResultService, { type QCResultSummaryDto, type QCStatus, type ValidationStatus, type AuthorisationStatus } from "@/services/qcResultService";
 import qcSampleService, { type QCSampleSummaryDto } from "@/services/qcSampleService";
 import testFileService, { type TestFileDto } from "@/services/testFileService";
 import { useAuth } from "@/contexts/auth/context";
+import { getErrorMessage } from "@/utils/apiError";
 
 // ── Westgard status ───────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<QCStatus, { label: string; icon: React.ElementType; color: string }> = {
@@ -84,7 +86,11 @@ function EntryModal({ onSave, onClose }: { onSave: (data: EntryForm) => Promise<
     try {
       const msg = await onSave({ ...data, resultDate: dayjs(data.resultDate).toISOString() });
       setSavedMsg(msg);
-    } catch (e: any) { setError("root", { message: e?.message }); }
+    } catch (err) {
+      const msg = getErrorMessage(err);
+      setError("root", { message: msg });
+      toast.error(msg);
+    }
   };
 
   if (savedMsg) return (
@@ -156,8 +162,13 @@ function ValidateModal({ result, onValidate, onClose }: {
   const [loading, setLoading] = useState(false);
   const handle = async (reject: boolean) => {
     setLoading(true);
-    try { await onValidate(reject, note || undefined); onClose(); }
-    finally { setLoading(false); }
+    try {
+      await onValidate(reject, note || undefined);
+      toast.success(reject ? "Result rejected." : "Result validated.");
+      onClose();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally { setLoading(false); }
   };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -219,8 +230,13 @@ export default function QCResultsPage() {
   const handleCancelValidation = async (r: QCResultSummaryDto) => {
     const reason = window.prompt("Reason for cancelling validation:");
     if (!reason) return;
-    await qcResultService.cancelValidation(r.id, reason);
-    load();
+    try {
+      await qcResultService.cancelValidation(r.id, reason);
+      toast.success("Validation cancelled.");
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
   const totalPages = Math.ceil(total / pageSize);

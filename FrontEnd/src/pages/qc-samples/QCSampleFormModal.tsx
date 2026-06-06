@@ -2,9 +2,11 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { toast } from "sonner";
 import type { QCSampleDto } from "@/services/qcSampleService";
 import type { InstrumentSummaryDto } from "@/services/instrumentService";
 import dayjs from "dayjs";
+import { getErrorMessage } from "@/utils/apiError";
 
 const schema = z.object({
   name:         z.string().min(1, "Name is required").max(100),
@@ -57,9 +59,12 @@ export default function QCSampleFormModal({ mode, item, instruments, onSave, onC
   const onSubmit = async (data: FormValues) => {
     try {
       await onSave(data);
+      toast.success(isEdit ? "QC Sample updated." : "QC Sample created.");
       onClose();
-    } catch (err: any) {
-      setError("root", { message: err?.message ?? "An error occurred." });
+    } catch (err) {
+      const msg = getErrorMessage(err);
+      setError("root", { message: msg });
+      toast.error(msg);
     }
   };
 

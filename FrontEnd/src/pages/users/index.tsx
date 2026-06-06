@@ -3,11 +3,13 @@ import {
   PlusIcon, MagnifyingGlassIcon, PencilSquareIcon,
   TrashIcon, ArrowPathIcon, CheckCircleIcon, XCircleIcon
 } from "@heroicons/react/24/outline";
+import { toast } from "sonner";
 import userService, { type UserSummaryDto } from "@/services/userService";
 import roleService, { type RoleDto } from "@/services/roleService";
 import UserFormModal from "./UserFormModal";
 import DeleteModal from "./DeleteModal";
 import { useAuth } from "@/contexts/auth/context";
+import { getErrorMessage } from "@/utils/apiError";
 
 const ROLE_COLORS: Record<string, string> = {
   Admin:      "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
@@ -60,14 +62,24 @@ export default function UsersPage() {
   };
 
   const handleDelete = async () => {
-    await userService.deleteUser(target!.id);
-    setModal(null);
-    load();
+    try {
+      await userService.deleteUser(target!.id);
+      setModal(null);
+      toast.success("User deleted.");
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
   const handleToggle = async (u: UserSummaryDto) => {
-    await userService.toggleActive(u.id);
-    load();
+    try {
+      await userService.toggleActive(u.id);
+      toast.success(u.isActive ? "User deactivated." : "User activated.");
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
   const totalPages = Math.ceil(total / pageSize);
