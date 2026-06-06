@@ -26,15 +26,36 @@ public class UpdateTestFileCommandHandler(
         file.Code = code;
         file.Type = request.Type.Trim();
         file.Unit = request.Unit?.Trim();
-
         await repo.UpdateAsync(file, cancellationToken);
+
+        // Soft-delete all existing parameters then re-create
+        var existing = await paramRepo.FindAsync(p => p.TestFileId == file.Id, cancellationToken);
+        foreach (var old in existing)
+            await paramRepo.DeleteAsync(old, cancellationToken);
+
+        var paramList = new List<TestFileParameter>();
+        foreach (var p in request.Parameters)
+        {
+            var param = new TestFileParameter
+            {
+                TestFileId    = file.Id,
+                ParameterName = p.ParameterName.Trim(),
+                TestCode      = p.TestCode?.Trim(),
+                OutputMask    = p.OutputMask?.Trim(),
+                Sequence      = p.Sequence,
+                Unit          = p.Unit?.Trim(),
+                LowerLimit    = p.LowerLimit,
+                UpperLimit    = p.UpperLimit
+            };
+            await paramRepo.AddAsync(param, cancellationToken);
+            paramList.Add(param);
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var parameters = await paramRepo.FindAsync(p => p.TestFileId == file.Id, cancellationToken);
-        var paramDtos  = parameters.OrderBy(p => p.Sequence).ThenBy(p => p.ParameterName)
-                                   .Select(p => new TestFileParameterDto(
-                                       p.Id, p.ParameterName, p.TestCode, p.OutputMask, p.Sequence,
-                                       p.Unit, p.LowerLimit, p.UpperLimit));
+        var paramDtos = paramList.OrderBy(p => p.Sequence).ThenBy(p => p.ParameterName)
+            .Select(p => new TestFileParameterDto(p.Id, p.ParameterName, p.TestCode, p.OutputMask,
+                p.Sequence, p.Unit, p.LowerLimit, p.UpperLimit));
 
         return Result<TestFileDto>.Success(
             new TestFileDto(file.Id, file.Name, file.Code, file.Type, file.Unit, file.IsActive, paramDtos, file.CreatedAt),

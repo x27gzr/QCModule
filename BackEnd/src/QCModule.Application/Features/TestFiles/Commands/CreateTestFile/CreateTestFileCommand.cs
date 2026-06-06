@@ -8,5 +8,6 @@ public record CreateTestFileCommand(
     string  Name,
     string  Code,
     string  Type,
-    string? Unit
+    string? Unit,
+    IEnumerable<ParameterInput> Parameters
 ) : IRequest<Result<TestFileDto>>;

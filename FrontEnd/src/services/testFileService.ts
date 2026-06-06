@@ -52,10 +52,10 @@ const testFileService = {
   getById: (id: string) =>
     api.get<{ data: TestFileDto }>(`/api/testfiles/${id}`),
 
-  create: (payload: { name: string; code: string; type: TestFileType; unit?: string }) =>
+  create: (payload: { name: string; code: string; type: TestFileType; unit?: string; parameters: ParameterPayload[] }) =>
     api.post<{ data: TestFileDto }>("/api/testfiles", payload),
 
-  update: (id: string, payload: { name: string; code: string; type: TestFileType; unit?: string }) =>
+  update: (id: string, payload: { name: string; code: string; type: TestFileType; unit?: string; parameters: ParameterPayload[] }) =>
     api.put<{ data: TestFileDto }>(`/api/testfiles/${id}`, { id, ...payload }),
 
   delete: (id: string) =>

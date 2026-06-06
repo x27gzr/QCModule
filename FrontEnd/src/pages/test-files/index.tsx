@@ -44,21 +44,85 @@ const inlineCls = "rounded border border-gray-200 px-2 py-1 text-sm dark:bg-dark
 
 // ── FileFormModal ─────────────────────────────────────────────────────────────
 
+type ParamRow = {
+  parameterName: string;
+  testCode: string;
+  outputMask: string;
+  sequence: number;
+  unit: string;
+  lowerLimit: string;
+  upperLimit: string;
+};
+
+const emptyParam = (seq: number): ParamRow => ({
+  parameterName: "", testCode: "", outputMask: "999990.9",
+  sequence: seq, unit: "", lowerLimit: "", upperLimit: "",
+});
+
 function FileFormModal({ item, onSave, onClose }: {
   item?: TestFileDto;
-  onSave: (d: FileForm) => Promise<void>;
+  onSave: (d: FileForm & { parameters: ParameterPayload[] }) => Promise<void>;
   onClose: () => void;
 }) {
   const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } =
     useForm<FileForm>({ resolver: zodResolver(fileSchema), defaultValues: { type: "Numerical" } });
 
+  const [params, setParams] = useState<ParamRow[]>([emptyParam(10)]);
+  const [paramError, setParamError] = useState<string>("");
+
   useEffect(() => {
-    if (item) reset({ name: item.name, code: item.code, type: item.type, unit: item.unit ?? "" });
+    if (item) {
+      reset({ name: item.name, code: item.code, type: item.type, unit: item.unit ?? "" });
+      setParams(
+        item.parameters.length > 0
+          ? item.parameters.map(p => ({
+              parameterName: p.parameterName,
+              testCode:      p.testCode ?? "",
+              outputMask:    p.outputMask ?? "",
+              sequence:      p.sequence,
+              unit:          p.unit ?? "",
+              lowerLimit:    p.lowerLimit != null ? String(p.lowerLimit) : "",
+              upperLimit:    p.upperLimit != null ? String(p.upperLimit) : "",
+            }))
+          : [emptyParam(10)]
+      );
+    }
   }, [item, reset]);
 
+  const updateParam = (idx: number, field: keyof ParamRow, value: string | number) => {
+    setParams(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+    setParamError("");
+  };
+
+  const addParam = () => {
+    const lastSeq = params.length > 0 ? Math.max(...params.map(p => p.sequence)) : 0;
+    setParams(prev => [...prev, emptyParam(lastSeq + 10)]);
+  };
+
+  const removeParam = (idx: number) => {
+    if (params.length === 1) return;
+    setParams(prev => prev.filter((_, i) => i !== idx));
+  };
+
   const onSubmit = async (d: FileForm) => {
+    const valid = params.filter(p => p.parameterName.trim() !== "");
+    if (valid.length === 0) {
+      setParamError("At least 1 parameter is required.");
+      return;
+    }
     try {
-      await onSave(d);
+      await onSave({
+        ...d,
+        parameters: valid.map(p => ({
+          parameterName: p.parameterName.trim(),
+          testCode:   p.testCode.trim()   || undefined,
+          outputMask: p.outputMask.trim() || undefined,
+          sequence:   Number(p.sequence),
+          unit:       p.unit.trim()       || undefined,
+          lowerLimit: p.lowerLimit !== "" ? Number(p.lowerLimit) : undefined,
+          upperLimit: p.upperLimit !== "" ? Number(p.upperLimit) : undefined,
+        })),
+      });
       toast.success(item ? "Test file updated." : "Test file created.");
       onClose();
     } catch (err) {
@@ -70,45 +134,121 @@ function FileFormModal({ item, onSave, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="dark:bg-dark-800 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-        <h2 className="dark:text-dark-100 mb-4 text-lg font-semibold">
-          {item ? "Edit Test File" : "Add Test File"}
-        </h2>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="dark:text-dark-300 mb-1 block text-xs font-medium text-gray-600">Name *</label>
-              <input {...register("name")} className={inputCls} placeholder="e.g. Sysmex XN 330" />
-              {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
+      <div className="dark:bg-dark-800 flex max-h-[90vh] w-full max-w-4xl flex-col rounded-xl bg-white shadow-xl">
+        {/* Header */}
+        <div className="border-b border-gray-100 px-6 py-4 dark:border-dark-600">
+          <h2 className="dark:text-dark-100 text-lg font-semibold">
+            {item ? "Edit Test File" : "Add Test File"}
+          </h2>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col overflow-hidden">
+          <div className="space-y-4 overflow-y-auto px-6 py-4">
+            {/* Header fields */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="dark:text-dark-300 mb-1 block text-xs font-medium text-gray-600">Name *</label>
+                <input {...register("name")} className={inputCls} placeholder="e.g. Sysmex XN 330" />
+                {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
+              </div>
+              <div>
+                <label className="dark:text-dark-300 mb-1 block text-xs font-medium text-gray-600">Code *</label>
+                <input {...register("code")} className={inputCls} placeholder="e.g. XNL330" />
+                {errors.code && <p className="mt-1 text-xs text-red-500">{errors.code.message}</p>}
+              </div>
             </div>
-            <div>
-              <label className="dark:text-dark-300 mb-1 block text-xs font-medium text-gray-600">Code *</label>
-              <input {...register("code")} className={inputCls} placeholder="e.g. XNL330" />
-              {errors.code && <p className="mt-1 text-xs text-red-500">{errors.code.message}</p>}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="dark:text-dark-300 mb-1 block text-xs font-medium text-gray-600">Type *</label>
+                <select {...register("type")} className={inputCls}>
+                  {TEST_FILE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                {errors.type && <p className="mt-1 text-xs text-red-500">{errors.type.message}</p>}
+              </div>
+              <div>
+                <label className="dark:text-dark-300 mb-1 block text-xs font-medium text-gray-600">Unit</label>
+                <input {...register("unit")} className={inputCls} placeholder="e.g. mg/dL" />
+              </div>
             </div>
+
+            {/* Parameters section */}
+            <div className="border-t border-gray-100 pt-4 dark:border-dark-600">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-700 dark:text-dark-200">Parameters</span>
+                <button type="button" onClick={addParam}
+                  className="text-primary-600 dark:text-primary-400 flex items-center gap-1 text-xs hover:underline">
+                  <PlusIcon className="size-3.5" /> Add Parameter
+                </button>
+              </div>
+
+              {/* Column headers */}
+              <div className="mb-1 grid grid-cols-12 gap-1 px-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-dark-400">
+                <span className="col-span-1">Seq</span>
+                <span className="col-span-2">Test Code</span>
+                <span className="col-span-3">Parameter Name *</span>
+                <span className="col-span-2">Output Mask</span>
+                <span className="col-span-1">Unit</span>
+                <span className="col-span-1">Low</span>
+                <span className="col-span-1">High</span>
+                <span className="col-span-1" />
+              </div>
+
+              <div className="space-y-1">
+                {params.map((row, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-1 rounded-lg bg-gray-50 px-2 py-1.5 dark:bg-dark-700">
+                    <input
+                      type="number" value={row.sequence}
+                      onChange={e => updateParam(idx, "sequence", Number(e.target.value))}
+                      className={`col-span-1 ${inlineCls}`} placeholder="Seq" />
+                    <input
+                      value={row.testCode}
+                      onChange={e => updateParam(idx, "testCode", e.target.value)}
+                      className={`col-span-2 ${inlineCls}`} placeholder="Test Code" />
+                    <input
+                      value={row.parameterName}
+                      onChange={e => updateParam(idx, "parameterName", e.target.value)}
+                      className={`col-span-3 ${inlineCls}`} placeholder="e.g. WBC" />
+                    <input
+                      value={row.outputMask}
+                      onChange={e => updateParam(idx, "outputMask", e.target.value)}
+                      className={`col-span-2 ${inlineCls}`} placeholder="999990.9" />
+                    <input
+                      value={row.unit}
+                      onChange={e => updateParam(idx, "unit", e.target.value)}
+                      className={`col-span-1 ${inlineCls}`} placeholder="Unit" />
+                    <input
+                      type="number" step="any" value={row.lowerLimit}
+                      onChange={e => updateParam(idx, "lowerLimit", e.target.value)}
+                      className={`col-span-1 ${inlineCls}`} placeholder="Low" />
+                    <input
+                      type="number" step="any" value={row.upperLimit}
+                      onChange={e => updateParam(idx, "upperLimit", e.target.value)}
+                      className={`col-span-1 ${inlineCls}`} placeholder="High" />
+                    <div className="col-span-1 flex items-center justify-center">
+                      <button type="button" onClick={() => removeParam(idx)}
+                        disabled={params.length === 1}
+                        className="rounded p-1 text-red-400 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed">
+                        <TrashIcon className="size-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {paramError && <p className="mt-2 text-xs text-red-500">{paramError}</p>}
+            </div>
+
+            {errors.root && <p className="text-xs text-red-500">{errors.root.message}</p>}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="dark:text-dark-300 mb-1 block text-xs font-medium text-gray-600">Type *</label>
-              <select {...register("type")} className={inputCls}>
-                {TEST_FILE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              {errors.type && <p className="mt-1 text-xs text-red-500">{errors.type.message}</p>}
-            </div>
-            <div>
-              <label className="dark:text-dark-300 mb-1 block text-xs font-medium text-gray-600">Unit</label>
-              <input {...register("unit")} className={inputCls} placeholder="e.g. mg/dL" />
-            </div>
-          </div>
-          {errors.root && <p className="text-xs text-red-500">{errors.root.message}</p>}
-          <div className="flex justify-end gap-2 pt-2">
+
+          {/* Footer */}
+          <div className="flex justify-end gap-2 border-t border-gray-100 px-6 py-4 dark:border-dark-600">
             <button type="button" onClick={onClose}
-              className="dark:text-dark-300 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-dark-700">
+              className="dark:text-dark-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-dark-700">
               Cancel
             </button>
             <button type="submit" disabled={isSubmitting}
               className="bg-primary-600 hover:bg-primary-700 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
-              {isSubmitting ? "Saving…" : item ? "Save" : "Create"}
+              {isSubmitting ? "Saving…" : item ? "Save Changes" : "Create"}
             </button>
           </div>
         </form>
@@ -310,6 +450,15 @@ export default function TestFilesPage() {
 
   const handleCreate = async (d: any) => { await testFileService.create(d); load(); };
   const handleEdit   = async (d: any) => { await testFileService.update(target!.id, d); load(); };
+  // Reload expanded data after edit
+  const handleEditWithRefresh = async (d: any) => {
+    await testFileService.update(target!.id, d);
+    if (expanded === target!.id) {
+      const res = await testFileService.getById(target!.id);
+      setExpandedData(prev => ({ ...prev, [target!.id]: res.data.data }));
+    }
+    load();
+  };
   const handleDelete = async () => {
     try {
       await testFileService.delete(target!.id);
@@ -421,7 +570,7 @@ export default function TestFilesPage() {
       </div>
 
       {modal === "create" && <FileFormModal onSave={handleCreate} onClose={() => setModal(null)} />}
-      {modal === "edit" && detail && <FileFormModal item={detail} onSave={handleEdit} onClose={() => { setModal(null); setDetail(null); }} />}
+      {modal === "edit" && detail && <FileFormModal item={detail} onSave={handleEditWithRefresh} onClose={() => { setModal(null); setDetail(null); }} />}
       {modal === "delete" && target && <DeleteModal name={target.name} onConfirm={handleDelete} onClose={() => setModal(null)} />}
     </div>
   );
