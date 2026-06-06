@@ -126,7 +126,7 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="dark:bg-dark-800 flex w-full max-w-3xl flex-col rounded-xl bg-white shadow-xl" style={{ maxHeight: "85vh" }}>
+      <div className="dark:bg-dark-800 flex w-full max-w-4xl flex-col rounded-xl bg-white shadow-xl" style={{ maxHeight: "85vh" }}>
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-dark-600">
@@ -157,19 +157,19 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
                   </h3>
 
                   {/* Column headers */}
-                  <div className="mb-1 grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-2 px-3 text-xs font-medium text-gray-400 dark:text-dark-500">
+                  <div className="mb-1 grid grid-cols-[2fr_1fr_1fr_1fr_1fr_4rem_3.5rem] gap-2 px-3 text-xs font-medium text-gray-400 dark:text-dark-500">
                     <span>Parameter</span>
                     <span>Mean</span>
                     <span>SD</span>
                     <span>CV (%)</span>
                     <span>TEA</span>
                     <span>Unit</span>
-                    <span className="w-14" />
+                    <span />
                   </div>
 
                   <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 dark:divide-dark-600 dark:border-dark-600">
                     {groupRows.map(row => (
-                      <div key={row.parameterId} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] items-center gap-2 px-3 py-2.5">
+                      <div key={row.parameterId} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_4rem_3.5rem] items-center gap-2 px-3 py-2.5">
                         {/* Parameter name */}
                         <div>
                           <p className="text-sm font-medium text-gray-800 dark:text-dark-100 flex items-center gap-1.5">
@@ -212,7 +212,7 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
                         </select>
 
                         {/* Save button */}
-                        <div className="flex w-14 items-center justify-end">
+                        <div className="flex items-center justify-end">
                           {row.saved ? (
                             <CheckCircleIcon className="size-5 text-emerald-500" />
                           ) : (
