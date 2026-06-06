@@ -21,7 +21,8 @@ public class SetupController(
     IRepository<User> userRepo,
     IRepository<Role> roleRepo,
     IUnitOfWork       unitOfWork,
-    IPasswordHasher   passwordHasher) : ControllerBase
+    IPasswordHasher   passwordHasher,
+    IConfiguration    configuration) : ControllerBase
 {
     [HttpPost("admin")]
     public async Task<ActionResult<Result<UserDto>>> CreateFirstAdmin(
@@ -55,6 +56,27 @@ public class SetupController(
             new UserDto(user.Id, user.Name, user.Nickname, user.Email, "Admin", user.IsActive, null, user.CreatedAt),
             "Admin user created successfully. This endpoint is now disabled."));
     }
+
+    [HttpPost("reset-password")]
+    public async Task<ActionResult<Result<string>>> ResetPassword(
+        [FromBody] ResetPasswordRequest request,
+        CancellationToken ct)
+    {
+        var expectedSecret = configuration["Setup:ResetSecret"];
+        if (string.IsNullOrWhiteSpace(expectedSecret) || request.Secret != expectedSecret)
+            return Unauthorized(Result<string>.Failure("Invalid secret key."));
+
+        var users = await userRepo.FindAsync(u => u.Email == request.Email.Trim().ToLower(), ct);
+        var user = users.FirstOrDefault()
+            ?? throw new NotFoundException($"User '{request.Email}' not found.");
+
+        user.PasswordHash = passwordHasher.Hash(request.NewPassword);
+        await userRepo.UpdateAsync(user, ct);
+        await unitOfWork.SaveChangesAsync(ct);
+
+        return Ok(Result<string>.Success(user.Email, "Password reset successfully."));
+    }
 }
 
 public record CreateAdminRequest(string Name, string Email, string Password);
+public record ResetPasswordRequest(string Secret, string Email, string NewPassword);
