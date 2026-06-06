@@ -5,9 +5,11 @@ using QCModule.Application.Features.QCSamples.DTOs;
 namespace QCModule.Application.Features.QCSamples.Commands.CreateQCSample;
 
 public record CreateQCSampleCommand(
-    string   Name,
-    string   LotNumber,
-    string   Level,
-    DateTime ExpiryDate,
-    Guid     InstrumentId
+    string           Name,
+    string           LotNumber,
+    string           Level,
+    DateTime         ExpiryDate,
+    Guid             InstrumentId,
+    bool             IsActive,
+    WestgardRulesDto WestgardRules
 ) : IRequest<Result<QCSampleDto>>;

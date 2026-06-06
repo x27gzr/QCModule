@@ -1,5 +1,6 @@
 using MediatR;
 using QCModule.Application.Common.Models;
+using QCModule.Application.Features.QCSamples.Commands.CreateQCSample;
 using QCModule.Application.Features.QCSamples.DTOs;
 using QCModule.Domain.Entities;
 using QCModule.Domain.Exceptions;
@@ -21,12 +22,7 @@ public class GetQCSampleByIdQueryHandler(
         var instruments = await instrumentRepo.FindAsync(i => i.Id == sample.InstrumentId, cancellationToken);
         var instrument  = instruments.FirstOrDefault();
 
-        var now = DateTime.UtcNow;
-        return Result<QCSampleDto>.Success(new QCSampleDto(
-            sample.Id, sample.Name, sample.LotNumber, sample.Level, sample.ExpiryDate,
-            sample.InstrumentId, instrument?.Name ?? "Unknown",
-            sample.ExpiryDate < now,
-            sample.ExpiryDate >= now && sample.ExpiryDate < now.AddDays(30),
-            sample.CreatedAt));
+        return Result<QCSampleDto>.Success(
+            CreateQCSampleCommandHandler.MapDto(sample, instrument?.Name ?? "Unknown", DateTime.UtcNow));
     }
 }

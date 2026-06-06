@@ -11,6 +11,8 @@ interface TargetRow {
   mean:          string;
   sd:            string;
   cv:            string;
+  tea:           string;
+  teaUnit:       string;
   saved:         boolean;
   saving:        boolean;
   error:         string | null;
@@ -55,6 +57,8 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
             mean:          existing ? String(existing.mean) : "",
             sd:            existing ? String(existing.sd)   : "",
             cv:            existing ? String(existing.cv)   : "",
+            tea:           existing?.tea != null ? String(existing.tea) : "",
+            teaUnit:       existing?.teaUnit ?? "%",
             saved:         false,
             saving:        false,
             error:         null,
@@ -71,7 +75,7 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
 
   useEffect(() => { load(); }, [load]);
 
-  const update = (parameterId: string, field: "mean" | "sd" | "cv", value: string) => {
+  const update = (parameterId: string, field: "mean" | "sd" | "cv" | "tea" | "teaUnit", value: string) => {
     setRows(prev => prev.map(r => {
       if (r.parameterId !== parameterId) return r;
       const next = { ...r, [field]: value, saved: false, error: null };
@@ -97,10 +101,14 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
     }
 
     setRows(prev => prev.map(r => r.parameterId === row.parameterId ? { ...r, saving: true, error: null } : r));
+    const tea = row.tea !== "" ? parseFloat(row.tea) : undefined;
+
     try {
       await qcResultService.upsertTarget(qcSampleId, {
         testFileParameterId: row.parameterId,
         mean, sd, cv,
+        tea:     tea && !isNaN(tea) ? tea : undefined,
+        teaUnit: row.teaUnit || "%",
       });
       setRows(prev => prev.map(r => r.parameterId === row.parameterId
         ? { ...r, saving: false, saved: true, hasTarget: true } : r));
@@ -149,17 +157,19 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
                   </h3>
 
                   {/* Column headers */}
-                  <div className="mb-1 grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 px-3 text-xs font-medium text-gray-400 dark:text-dark-500">
+                  <div className="mb-1 grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-2 px-3 text-xs font-medium text-gray-400 dark:text-dark-500">
                     <span>Parameter</span>
                     <span>Mean</span>
                     <span>SD</span>
                     <span>CV (%)</span>
-                    <span className="w-16" />
+                    <span>TEA</span>
+                    <span>Unit</span>
+                    <span className="w-14" />
                   </div>
 
                   <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 dark:divide-dark-600 dark:border-dark-600">
                     {groupRows.map(row => (
-                      <div key={row.parameterId} className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] items-center gap-2 px-3 py-2.5">
+                      <div key={row.parameterId} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] items-center gap-2 px-3 py-2.5">
                         {/* Parameter name */}
                         <div>
                           <p className="text-sm font-medium text-gray-800 dark:text-dark-100 flex items-center gap-1.5">
@@ -170,39 +180,45 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
                         </div>
 
                         {/* Mean */}
-                        <input
-                          type="number" step="any" value={row.mean}
+                        <input type="number" step="any" value={row.mean}
                           onChange={e => update(row.parameterId, "mean", e.target.value)}
                           placeholder="0.00"
-                          className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                        />
+                          className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
 
                         {/* SD */}
-                        <input
-                          type="number" step="any" value={row.sd}
+                        <input type="number" step="any" value={row.sd}
                           onChange={e => update(row.parameterId, "sd", e.target.value)}
                           placeholder="0.00"
-                          className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                        />
+                          className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
 
                         {/* CV */}
-                        <input
-                          type="number" step="any" value={row.cv}
+                        <input type="number" step="any" value={row.cv}
                           onChange={e => update(row.parameterId, "cv", e.target.value)}
                           placeholder="auto"
-                          className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                        />
+                          className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+
+                        {/* TEA */}
+                        <input type="number" step="any" value={row.tea}
+                          onChange={e => update(row.parameterId, "tea", e.target.value)}
+                          placeholder="e.g. 10"
+                          className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+
+                        {/* TEA Unit */}
+                        <select value={row.teaUnit}
+                          onChange={e => update(row.parameterId, "teaUnit", e.target.value)}
+                          className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                          <option value="%">%</option>
+                          <option value="abs">abs</option>
+                        </select>
 
                         {/* Save button */}
-                        <div className="flex w-16 items-center justify-end">
+                        <div className="flex w-14 items-center justify-end">
                           {row.saved ? (
                             <CheckCircleIcon className="size-5 text-emerald-500" />
                           ) : (
-                            <button
-                              onClick={() => save(row)}
+                            <button onClick={() => save(row)}
                               disabled={row.saving || (!row.mean && !row.sd)}
-                              className="rounded-lg bg-primary-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-40"
-                            >
+                              className="rounded-lg bg-primary-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-40">
                               {row.saving ? "…" : "Save"}
                             </button>
                           )}
@@ -210,7 +226,7 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
 
                         {/* Error */}
                         {row.error && (
-                          <p className="col-span-5 -mt-1 px-1 text-xs text-red-500">{row.error}</p>
+                          <p className="col-span-7 -mt-1 px-1 text-xs text-red-500">{row.error}</p>
                         )}
                       </div>
                     ))}
@@ -224,7 +240,7 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
         {/* Footer */}
         <div className="border-t border-gray-100 px-6 py-3 dark:border-dark-600">
           <p className="dark:text-dark-400 text-xs text-gray-400">
-            CV is auto-calculated from Mean and SD. Click <strong>Save</strong> per row to update.
+            CV is auto-calculated from Mean and SD. TEA = Total Allowable Error (optional). Click <strong>Save</strong> per row to update.
             <span className="ml-2 inline-flex items-center gap-1">
               <span className="inline-block size-1.5 rounded-full bg-emerald-500" /> = target already set
             </span>

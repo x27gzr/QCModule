@@ -21,9 +21,9 @@ public class QCSamplesController(IMediator mediator) : ControllerBase
     [HttpGet]
     [Authorize(Policy = Permissions.QCSamples.View)]
     public async Task<ActionResult<Result<PaginatedResult<QCSampleSummaryDto>>>> GetAll(
-        [FromQuery] string? search, [FromQuery] Guid? instrumentId,
+        [FromQuery] string? search, [FromQuery] Guid? instrumentId, [FromQuery] bool? isActive,
         [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
-        => Ok(await mediator.Send(new GetQCSamplesQuery(search, instrumentId, page, pageSize), ct));
+        => Ok(await mediator.Send(new GetQCSamplesQuery(search, instrumentId, isActive, page, pageSize), ct));
 
     [HttpGet("{id:guid}")]
     [Authorize(Policy = Permissions.QCSamples.View)]
@@ -61,7 +61,15 @@ public class QCSamplesController(IMediator mediator) : ControllerBase
     [Authorize(Policy = Permissions.QCSamples.Manage)]
     public async Task<ActionResult<Result<QCSampleTargetDto>>> UpsertTarget(
         Guid id, [FromBody] UpsertTargetRequest body, CancellationToken ct)
-        => Ok(await mediator.Send(new UpsertTargetCommand(id, body.TestFileParameterId, body.Mean, body.SD, body.CV), ct));
+        => Ok(await mediator.Send(
+            new UpsertTargetCommand(id, body.TestFileParameterId, body.Mean, body.SD, body.CV, body.Tea, body.TeaUnit), ct));
 }
 
-public record UpsertTargetRequest(Guid TestFileParameterId, double Mean, double SD, double CV);
+public record UpsertTargetRequest(
+    Guid    TestFileParameterId,
+    double  Mean,
+    double  SD,
+    double  CV,
+    double? Tea,
+    string? TeaUnit
+);

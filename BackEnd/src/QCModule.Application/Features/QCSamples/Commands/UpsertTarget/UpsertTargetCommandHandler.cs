@@ -33,15 +33,21 @@ public class UpsertTargetCommandHandler(
             {
                 QCSampleId          = request.QCSampleId,
                 TestFileParameterId = request.TestFileParameterId,
-                Mean = request.Mean, SD = request.SD, CV = request.CV
+                Mean    = request.Mean,
+                SD      = request.SD,
+                CV      = request.CV,
+                Tea     = request.Tea,
+                TeaUnit = request.TeaUnit ?? "%",
             };
             await targetRepo.AddAsync(target, cancellationToken);
         }
         else
         {
-            target.Mean = request.Mean;
-            target.SD   = request.SD;
-            target.CV   = request.CV;
+            target.Mean    = request.Mean;
+            target.SD      = request.SD;
+            target.CV      = request.CV;
+            target.Tea     = request.Tea;
+            target.TeaUnit = request.TeaUnit ?? "%";
             await targetRepo.UpdateAsync(target, cancellationToken);
         }
 
@@ -49,7 +55,7 @@ public class UpsertTargetCommandHandler(
 
         return Result<QCSampleTargetDto>.Success(
             new QCSampleTargetDto(target.Id, target.QCSampleId, target.TestFileParameterId,
-                param.ParameterName, param.Unit, target.Mean, target.SD, target.CV),
+                param.ParameterName, param.Unit, target.Mean, target.SD, target.CV, target.Tea, target.TeaUnit),
             "Target saved.");
     }
 }

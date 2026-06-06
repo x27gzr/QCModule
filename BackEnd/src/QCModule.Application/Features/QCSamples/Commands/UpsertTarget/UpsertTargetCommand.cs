@@ -5,9 +5,11 @@ using QCModule.Application.Features.QCSamples.DTOs;
 namespace QCModule.Application.Features.QCSamples.Commands.UpsertTarget;
 
 public record UpsertTargetCommand(
-    Guid   QCSampleId,
-    Guid   TestFileParameterId,
-    double Mean,
-    double SD,
-    double CV
+    Guid    QCSampleId,
+    Guid    TestFileParameterId,
+    double  Mean,
+    double  SD,
+    double  CV,
+    double? Tea,
+    string? TeaUnit
 ) : IRequest<Result<QCSampleTargetDto>>;

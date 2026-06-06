@@ -38,7 +38,8 @@ export default function QCSamplesPage() {
   const [total,       setTotal]       = useState(0);
   const [page,        setPage]        = useState(1);
   const [search,      setSearch]      = useState("");
-  const [filterInstr, setFilterInstr] = useState("");
+  const [filterInstr,    setFilterInstr]    = useState("");
+  const [filterIsActive, setFilterIsActive] = useState<"" | "true" | "false">("");
   const [loading,     setLoading]     = useState(true);
 
   const [modal,         setModal]         = useState<"create" | "edit" | "delete" | null>(null);
@@ -54,12 +55,13 @@ export default function QCSamplesPage() {
       const res = await qcSampleService.getAll({
         search: search || undefined,
         instrumentId: filterInstr || undefined,
+        isActive: filterIsActive === "" ? undefined : filterIsActive === "true",
         page, pageSize,
       });
       setItems(res.data.data.items);
       setTotal(res.data.data.totalCount);
     } finally { setLoading(false); }
-  }, [search, filterInstr, page]);
+  }, [search, filterInstr, filterIsActive, page]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -104,6 +106,12 @@ export default function QCSamplesPage() {
             <option value="">All Instruments</option>
             {instruments.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
           </select>
+          <select value={filterIsActive} onChange={e => { setFilterIsActive(e.target.value as any); setPage(1); }}
+            className="dark:bg-dark-800 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+            <option value="">All Status</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={load} className="dark:text-dark-300 dark:hover:bg-dark-700 rounded-lg p-2 text-gray-500 hover:bg-gray-100">
@@ -128,15 +136,16 @@ export default function QCSamplesPage() {
               <th className="px-4 py-3">Level</th>
               <th className="px-4 py-3">Instrument</th>
               <th className="px-4 py-3">Expiry Date</th>
+              <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-dark-600">
             {loading ? (
-              <tr><td colSpan={6} className="dark:text-dark-400 py-12 text-center text-gray-400">Loading…</td></tr>
+              <tr><td colSpan={7} className="dark:text-dark-400 py-12 text-center text-gray-400">Loading…</td></tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-16 text-center">
+                <td colSpan={7} className="py-16 text-center">
                   <ClipboardDocumentListIcon className="mx-auto mb-3 size-10 text-gray-300 dark:text-dark-500" />
                   <p className="dark:text-dark-400 text-sm text-gray-400">No QC samples found.</p>
                 </td>
@@ -163,6 +172,15 @@ export default function QCSamplesPage() {
                 </td>
                 <td className="dark:text-dark-300 px-4 py-3 text-gray-500">{item.instrumentName}</td>
                 <td className="px-4 py-3"><ExpiryBadge item={item} /></td>
+                <td className="px-4 py-3">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    item.isActive
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+                      : "bg-gray-100 text-gray-500 dark:bg-dark-600 dark:text-dark-400"
+                  }`}>
+                    {item.isActive ? "Active" : "Inactive"}
+                  </span>
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
                     {/* Targets button — visible to all roles */}

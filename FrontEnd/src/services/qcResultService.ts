@@ -50,6 +50,8 @@ export interface QCSampleTargetDto {
   mean: number;
   sd: number;
   cv: number;
+  tea: number | null;
+  teaUnit: string | null;
 }
 
 export interface LeveyJenningsPoint {
@@ -133,7 +135,7 @@ const qcResultService = {
   getTargets: (qcSampleId: string) =>
     api.get<{ data: QCSampleTargetDto[] }>(`/api/qcsamples/${qcSampleId}/targets`),
 
-  upsertTarget: (qcSampleId: string, payload: { testFileParameterId: string; mean: number; sd: number; cv: number }) =>
+  upsertTarget: (qcSampleId: string, payload: { testFileParameterId: string; mean: number; sd: number; cv: number; tea?: number; teaUnit?: string }) =>
     api.put<{ data: QCSampleTargetDto }>(`/api/qcsamples/${qcSampleId}/targets`, payload),
 
   getLeveyJennings: (params: {

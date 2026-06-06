@@ -31,6 +31,9 @@ public class GetQCSamplesQueryHandler(
         if (request.InstrumentId.HasValue)
             query = query.Where(s => s.InstrumentId == request.InstrumentId.Value);
 
+        if (request.IsActive.HasValue)
+            query = query.Where(s => s.IsActive == request.IsActive.Value);
+
         var now      = DateTime.UtcNow;
         var ordered  = query.OrderBy(s => s.ExpiryDate).ToList();
         var total    = ordered.Count;
@@ -43,6 +46,7 @@ public class GetQCSamplesQueryHandler(
             .Select(s => new QCSampleSummaryDto(
                 s.Id, s.Name, s.LotNumber, s.Level, s.ExpiryDate,
                 instrMap.GetValueOrDefault(s.InstrumentId, "Unknown"),
+                s.IsActive,
                 s.ExpiryDate < now,
                 s.ExpiryDate >= now && s.ExpiryDate < now.AddDays(30)))
             .ToList();

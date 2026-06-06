@@ -23,7 +23,7 @@ public class GetQCSampleTargetsQueryHandler(
             paramMap.TryGetValue(t.TestFileParameterId, out var p);
             return new QCSampleTargetDto(
                 t.Id, t.QCSampleId, t.TestFileParameterId,
-                p?.ParameterName ?? "Unknown", p?.Unit, t.Mean, t.SD, t.CV);
+                p?.ParameterName ?? "Unknown", p?.Unit, t.Mean, t.SD, t.CV, t.Tea, t.TeaUnit);
         }).OrderBy(t => t.ParameterName);
 
         return Result<IEnumerable<QCSampleTargetDto>>.Success(dtos);

@@ -8,5 +8,7 @@ public record QCSampleTargetDto(
     string? Unit,
     double  Mean,
     double  SD,
-    double  CV
+    double  CV,
+    double? Tea,
+    string? TeaUnit
 );
