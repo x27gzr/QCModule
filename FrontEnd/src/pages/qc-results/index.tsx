@@ -839,7 +839,6 @@ export default function QCResultsPage() {
           </>
         )}
       </div>
-      </div>
     </div>
   );
 }
