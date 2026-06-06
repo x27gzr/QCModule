@@ -5,8 +5,8 @@ import type { WestgardRules } from "@/services/qcSampleService";
 
 // ── Z-score chart constants ───────────────────────────────────────────────────
 const W    = 900;
-const H    = 260;
-const PAD  = { top: 20, right: 16, bottom: 30, left: 44 };
+const H    = 290;
+const PAD  = { top: 22, right: 16, bottom: 28, left: 44 };
 const PW   = W - PAD.left - PAD.right;
 const PH   = H - PAD.top  - PAD.bottom;
 const Y_MIN = -4;
@@ -100,11 +100,11 @@ interface Props {
   data: LeveyJenningsDto;
   westgardRules?: WestgardRules;
   maxPoints?: number;
-  /** Show full chart with violations panel (Reports page) */
   showViolations?: boolean;
+  fillHeight?: boolean;
 }
 
-export default function LeveyJenningsChart({ data, westgardRules, maxPoints, showViolations = true }: Props) {
+export default function LeveyJenningsChart({ data, westgardRules, maxPoints, showViolations = true, fillHeight = false }: Props) {
   const [hover, setHover] = useState<number | null>(null);
 
   const { mean, sd } = data;
@@ -126,8 +126,11 @@ export default function LeveyJenningsChart({ data, westgardRules, maxPoints, sho
 
   return (
     <div className="w-full space-y-3">
-      <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 560 }}>
+      <div className={fillHeight ? "h-full overflow-hidden" : "overflow-x-auto"}>
+        <svg viewBox={`0 0 ${W} ${H}`}
+          style={fillHeight ? { width: '100%', height: '100%' } : { minWidth: 480 }}
+          className={fillHeight ? "" : "w-full"}
+          preserveAspectRatio={fillHeight ? "none" : "xMidYMid meet"}>
 
           {/* Background */}
           <rect x={PAD.left} y={PAD.top} width={PW} height={PH} fill="none" />

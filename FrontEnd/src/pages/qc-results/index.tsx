@@ -734,33 +734,32 @@ export default function QCResultsPage() {
       </div>
 
       {/* ── LJ Panel — FIXED di bawah, tidak ikut scroll ─────────────── */}
-      <div className="dark:bg-dark-800 dark:border-dark-600 flex h-[270px] shrink-0 flex-col overflow-hidden border-t border-gray-200 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
-      <div className="dark:bg-dark-800 dark:border-dark-600 overflow-hidden bg-white" style={{height:'100%'}}>
+      <div className="dark:bg-dark-800 dark:border-dark-600 flex h-[330px] shrink-0 flex-col overflow-hidden border-t border-gray-200 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
         {!ljParamId ? (
           /* Placeholder */
-          <div className="flex h-32 flex-col items-center justify-center gap-2 text-center">
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
             <ChartBarIcon className="size-8 text-gray-200 dark:text-dark-600" />
             <p className="text-sm text-gray-400 dark:text-dark-500">
               Klik icon <ChartBarIcon className="inline size-3.5 text-emerald-500" /> pada baris hasil di atas untuk menampilkan Levey-Jennings Chart
             </p>
           </div>
         ) : ljLoading ? (
-          <div className="flex h-48 items-center justify-center">
+          <div className="flex h-full items-center justify-center">
             <div className="border-primary-500 size-7 animate-spin rounded-full border-4 border-t-transparent" />
           </div>
         ) : ljData && (
           <>
             {/* Chart title bar */}
-            <div className="dark:border-dark-600 border-b border-gray-100 px-5 py-2.5 text-center">
+            <div className="dark:border-dark-600 shrink-0 border-b border-gray-100 px-5 py-2 text-center">
               <span className="dark:text-dark-100 text-sm font-semibold text-gray-700">
                 {ljData.parameterName}{ljData.unit ? ` (${ljData.unit})` : ""} — {ljData.level}
               </span>
             </div>
 
-            {/* Split: info kiri + chart kanan */}
-            <div className="flex">
+            {/* Split: info kiri + chart kanan — fills remaining height */}
+            <div className="flex min-h-0 flex-1 overflow-hidden">
               {/* ── Kiri: info panel ────────────────────────────────────── */}
-              <div className="dark:border-dark-600 dark:text-dark-300 w-52 shrink-0 border-r border-gray-100 p-4 text-xs text-gray-600">
+              <div className="dark:border-dark-600 dark:text-dark-300 w-44 shrink-0 overflow-y-auto border-r border-gray-100 p-3 text-xs text-gray-600">
                 <div className="space-y-1">
                   <div><span className="text-gray-400">Lot No</span><span className="float-right font-medium">{ljSample?.lotNumber ?? "—"}</span></div>
                   <div><span className="text-gray-400">Exp Date</span><span className="float-right font-medium">{ljSample ? dayjs(ljSample.expiryDate).format("DD-MM-YYYY") : "—"}</span></div>
@@ -816,7 +815,7 @@ export default function QCResultsPage() {
               </div>
 
               {/* ── Kanan: Z-score chart ─────────────────────────────── */}
-              <div className="min-w-0 flex-1 p-3">
+              <div className="min-w-0 flex-1 overflow-hidden px-2 py-1">
                 {!ljData.hasTarget ? (
                   <div className="flex h-full flex-col items-center justify-center text-center">
                     <ExclamationTriangleIcon className="mb-2 size-8 text-amber-400" />
@@ -832,6 +831,7 @@ export default function QCResultsPage() {
                     westgardRules={ljRules ?? undefined}
                     maxPoints={20}
                     showViolations={false}
+                    fillHeight={true}
                   />
                 )}
               </div>
