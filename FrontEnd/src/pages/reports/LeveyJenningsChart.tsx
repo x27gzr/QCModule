@@ -3,22 +3,21 @@ import dayjs from "dayjs";
 import type { LeveyJenningsDto, LeveyJenningsPoint, QCStatus } from "@/services/qcResultService";
 import type { WestgardRules } from "@/services/qcSampleService";
 
-// ── colour palette ────────────────────────────────────────────────────────────
-const STATUS_COLOR: Record<QCStatus, string> = {
-  Accepted: "#10b981",
-  Warning:  "#f59e0b",
-  Rejected: "#ef4444",
-  Pending:  "#9ca3af",
-};
+// ── Z-score chart constants ───────────────────────────────────────────────────
+const W    = 900;
+const H    = 340;
+const PAD  = { top: 28, right: 16, bottom: 36, left: 44 };
+const PW   = W - PAD.left - PAD.right;
+const PH   = H - PAD.top  - PAD.bottom;
+const Y_MIN = -4;
+const Y_MAX =  4;
+const Y_SPAN = Y_MAX - Y_MIN;
 
-// ── SVG layout constants ──────────────────────────────────────────────────────
-const W = 860;
-const H = 420;
-const PAD = { top: 24, right: 70, bottom: 48, left: 56 };
-const PLOT_W = W - PAD.left - PAD.right;
-const PLOT_H = H - PAD.top - PAD.bottom;
+const yOf = (z: number) => PAD.top + ((Y_MAX - z) / Y_SPAN) * PH;
+const xOf = (i: number, n: number) =>
+  n <= 1 ? PAD.left + PW / 2 : PAD.left + (i / (n - 1)) * PW;
 
-// ── Westgard violation types ──────────────────────────────────────────────────
+// ── Westgard violation engine ─────────────────────────────────────────────────
 interface Violation {
   pointIndices: number[];
   rule: string;
@@ -27,263 +26,214 @@ interface Violation {
 }
 
 function computeViolations(
-  points: LeveyJenningsPoint[],
+  pts: LeveyJenningsPoint[],
   mean: number,
   sd: number,
   rules: WestgardRules,
 ): Violation[] {
-  if (!sd || points.length === 0) return [];
-
-  const zs   = points.map(p => (p.value - mean) / sd);
+  if (!sd || pts.length === 0) return [];
+  const zs   = pts.map(p => (p.value - mean) / sd);
   const viols: Violation[] = [];
-  const fmt   = (i: number) => dayjs(points[i].resultDate).format("DD/MM");
+  const fmt  = (i: number) => dayjs(pts[i].resultDate).format("DD/MM");
 
-  for (let i = 0; i < points.length; i++) {
+  for (let i = 0; i < pts.length; i++) {
     const z = zs[i];
-
-    // 1:3s — single point beyond ±3SD → rejection
     if (rules.rule1_3s && Math.abs(z) > 3)
       viols.push({ pointIndices: [i], rule: "1:3s", type: "rejection",
-        msg: `Point ${i + 1} (${fmt(i)}): value ${points[i].value} >${z > 0 ? "+" : ""}3SD` });
-
-    // 1:2s — single point beyond ±2SD → warning
+        msg: `Titik ${i + 1} (${fmt(i)}): ${pts[i].value} melewati ±3SD` });
     else if (rules.rule1_2s && Math.abs(z) > 2)
       viols.push({ pointIndices: [i], rule: "1:2s", type: "warning",
-        msg: `Point ${i + 1} (${fmt(i)}): value ${points[i].value} >${z > 0 ? "+" : ""}2SD` });
+        msg: `Titik ${i + 1} (${fmt(i)}): ${pts[i].value} melewati ±2SD` });
 
     if (i >= 1) {
-      // 2:2s — two consecutive both beyond ±2SD same side → rejection
-      if (rules.rule2_2s && Math.abs(z) > 2 && Math.abs(zs[i - 1]) > 2 &&
-          Math.sign(z) === Math.sign(zs[i - 1]))
-        viols.push({ pointIndices: [i - 1, i], rule: "2:2s", type: "rejection",
-          msg: `Points ${i} & ${i + 1} (${fmt(i - 1)}–${fmt(i)}): 2 consecutive >±2SD same side` });
-
-      // R:4s — two consecutive differ by >4SD → rejection
-      if (rules.ruleR_4s && Math.abs(z - zs[i - 1]) > 4)
-        viols.push({ pointIndices: [i - 1, i], rule: "R:4s", type: "rejection",
-          msg: `Points ${i} & ${i + 1} (${fmt(i - 1)}–${fmt(i)}): range between values >4SD` });
+      if (rules.rule2_2s && Math.abs(z) > 2 && Math.abs(zs[i-1]) > 2 && Math.sign(z) === Math.sign(zs[i-1]))
+        viols.push({ pointIndices: [i-1,i], rule: "2:2s", type: "rejection",
+          msg: `Titik ${i}–${i+1} (${fmt(i-1)}–${fmt(i)}): 2 berturut >±2SD sisi sama` });
+      if (rules.ruleR_4s && Math.abs(z - zs[i-1]) > 4)
+        viols.push({ pointIndices: [i-1,i], rule: "R:4s", type: "rejection",
+          msg: `Titik ${i}–${i+1}: rentang >4SD` });
     }
-
-    if (i >= 2) {
-      // 3:1s — 3 consecutive beyond ±1SD same side → warning
-      if (rules.rule3_1s) {
-        const seg = zs.slice(i - 2, i + 1);
-        if (seg.every(z => z > 1) || seg.every(z => z < -1))
-          viols.push({ pointIndices: [i - 2, i - 1, i], rule: "3:1s", type: "warning",
-            msg: `Points ${i - 1}–${i + 1} (${fmt(i - 2)}–${fmt(i)}): 3 consecutive >±1SD same side` });
-      }
+    if (i >= 2 && rules.rule3_1s) {
+      const seg = zs.slice(i-2, i+1);
+      if (seg.every(v => v > 1) || seg.every(v => v < -1))
+        viols.push({ pointIndices: [i-2,i-1,i], rule: "3:1s", type: "warning",
+          msg: `Titik ${i-1}–${i+1}: 3 berturut >±1SD sisi sama` });
     }
-
-    if (i >= 3) {
-      // 4:1s — 4 consecutive beyond ±1SD same side → rejection
-      if (rules.rule4_1s) {
-        const seg = zs.slice(i - 3, i + 1);
-        if (seg.every(z => z > 1) || seg.every(z => z < -1))
-          viols.push({ pointIndices: [i - 3, i - 2, i - 1, i], rule: "4:1s", type: "rejection",
-            msg: `Points ${i - 2}–${i + 1} (${fmt(i - 3)}–${fmt(i)}): 4 consecutive >±1SD same side` });
-      }
+    if (i >= 3 && rules.rule4_1s) {
+      const seg = zs.slice(i-3, i+1);
+      if (seg.every(v => v > 1) || seg.every(v => v < -1))
+        viols.push({ pointIndices: [i-3,i-2,i-1,i], rule: "4:1s", type: "rejection",
+          msg: `Titik ${i-2}–${i+1}: 4 berturut >±1SD sisi sama` });
     }
-
-    if (i >= 8) {
-      // 9x — 9 consecutive same side of mean → rejection
-      if (rules.rule9x) {
-        const seg = zs.slice(i - 8, i + 1);
-        if (seg.every(z => z > 0) || seg.every(z => z < 0))
-          viols.push({ pointIndices: Array.from({ length: 9 }, (_, k) => i - 8 + k), rule: "9x", type: "rejection",
-            msg: `Points ${i - 7}–${i + 1} (${fmt(i - 8)}–${fmt(i)}): 9 consecutive same side of mean` });
-      }
+    if (i >= 8 && rules.rule9x) {
+      const seg = zs.slice(i-8, i+1);
+      if (seg.every(v => v > 0) || seg.every(v => v < 0))
+        viols.push({ pointIndices: Array.from({length:9},(_,k)=>i-8+k), rule: "9x", type: "rejection",
+          msg: `Titik ${i-7}–${i+1}: 9 berturut sisi yang sama` });
     }
-
-    if (i >= 9) {
-      // 10x — 10 consecutive same side of mean → rejection
-      if (rules.rule10x) {
-        const seg = zs.slice(i - 9, i + 1);
-        if (seg.every(z => z > 0) || seg.every(z => z < 0))
-          viols.push({ pointIndices: Array.from({ length: 10 }, (_, k) => i - 9 + k), rule: "10x", type: "rejection",
-            msg: `Points ${i - 8}–${i + 1} (${fmt(i - 9)}–${fmt(i)}): 10 consecutive same side of mean` });
-      }
+    if (i >= 9 && rules.rule10x) {
+      const seg = zs.slice(i-9, i+1);
+      if (seg.every(v => v > 0) || seg.every(v => v < 0))
+        viols.push({ pointIndices: Array.from({length:10},(_,k)=>i-9+k), rule: "10x", type: "rejection",
+          msg: `Titik ${i-8}–${i+1}: 10 berturut sisi yang sama` });
     }
   }
-
   return viols;
+}
+
+// ── Dot colour ────────────────────────────────────────────────────────────────
+const STATUS_COLOR: Record<QCStatus, string> = {
+  Accepted: "#2563eb",  // blue — like HCLab
+  Warning:  "#f59e0b",
+  Rejected: "#ef4444",
+  Pending:  "#9ca3af",
+};
+
+function dotColor(i: number, viols: Violation[], status: QCStatus): string {
+  if (viols.some(v => v.pointIndices.includes(i) && v.type === "rejection")) return "#ef4444";
+  if (viols.some(v => v.pointIndices.includes(i) && v.type === "warning"))   return "#f59e0b";
+  return STATUS_COLOR[status];
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   data: LeveyJenningsDto;
   westgardRules?: WestgardRules;
-  maxPoints?: number;    // slice to last N points (default: all)
+  maxPoints?: number;
+  /** Show full chart with violations panel (Reports page) */
+  showViolations?: boolean;
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-export default function LeveyJenningsChart({ data, westgardRules, maxPoints }: Props) {
+export default function LeveyJenningsChart({ data, westgardRules, maxPoints, showViolations = true }: Props) {
   const [hover, setHover] = useState<number | null>(null);
 
   const { mean, sd } = data;
-  // Slice to last maxPoints
-  const points = maxPoints ? data.points.slice(-maxPoints) : data.points;
+  const pts = maxPoints ? data.points.slice(-maxPoints) : data.points;
+  const n   = pts.length;
 
-  // Violations (computed from active rules)
-  const violations = westgardRules
-    ? computeViolations(points, mean, sd, westgardRules)
-    : [];
+  const viols = westgardRules ? computeViolations(pts, mean, sd, westgardRules) : [];
 
-  // Per-point violation severity (for colouring)
-  const pointViolType = points.map((_, i) => {
-    const viol = violations.filter(v => v.pointIndices.includes(i));
-    if (viol.some(v => v.type === "rejection")) return "rejection";
-    if (viol.some(v => v.type === "warning"))   return "warning";
-    return null;
-  });
+  // Z-scores (use stored zScore OR recompute from mean/sd)
+  const zs = pts.map(p => sd > 0 ? (p.value - mean) / sd : p.zScore);
 
-  // Y domain
-  const values  = points.map(p => p.value);
-  const dataMin = values.length ? Math.min(...values) : data.minus3SD;
-  const dataMax = values.length ? Math.max(...values) : data.plus3SD;
-  const yMin    = Math.min(data.minus3SD, dataMin) - sd * 0.4;
-  const yMax    = Math.max(data.plus3SD, dataMax)  + sd * 0.4;
-  const ySpan   = yMax - yMin || 1;
+  // Build polyline
+  const polylinePoints = pts.map((_, i) =>
+    `${xOf(i, n).toFixed(1)},${yOf(zs[i]).toFixed(1)}`
+  ).join(" ");
 
-  const yOf = (v: number) => PAD.top + ((yMax - v) / ySpan) * PLOT_H;
-  const xOf = (i: number) =>
-    points.length <= 1
-      ? PAD.left + PLOT_W / 2
-      : PAD.left + (i / (points.length - 1)) * PLOT_W;
-
-  const limits = [
-    { v: data.plus3SD,  label: "+3SD", color: "#ef4444", dash: "4 3" },
-    { v: data.plus2SD,  label: "+2SD", color: "#f59e0b", dash: "4 3" },
-    { v: data.plus1SD,  label: "+1SD", color: "#94a3b8", dash: "2 3" },
-    { v: mean,          label: "Mean", color: "#3b82f6", dash: "" },
-    { v: data.minus1SD, label: "-1SD", color: "#94a3b8", dash: "2 3" },
-    { v: data.minus2SD, label: "-2SD", color: "#f59e0b", dash: "4 3" },
-    { v: data.minus3SD, label: "-3SD", color: "#ef4444", dash: "4 3" },
-  ];
-
-  const bands = [
-    { from: data.plus2SD,  to: data.plus3SD,  fill: "#ef4444", opacity: 0.05 },
-    { from: data.plus1SD,  to: data.plus2SD,  fill: "#f59e0b", opacity: 0.05 },
-    { from: data.minus1SD, to: data.plus1SD,  fill: "#10b981", opacity: 0.05 },
-    { from: data.minus2SD, to: data.minus1SD, fill: "#f59e0b", opacity: 0.05 },
-    { from: data.minus3SD, to: data.minus2SD, fill: "#ef4444", opacity: 0.05 },
-  ];
-
-  const linePath = points
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${xOf(i).toFixed(1)} ${yOf(p.value).toFixed(1)}`)
-    .join(" ");
-
-  const labelStep = Math.max(1, Math.ceil(points.length / 8));
-
-  // Determine dot colour: violations override stored status
-  const dotColor = (i: number): string => {
-    if (pointViolType[i] === "rejection") return "#ef4444";
-    if (pointViolType[i] === "warning")   return "#f59e0b";
-    return STATUS_COLOR[points[i].status];
-  };
-
-  // Active rules badge list
-  const RULE_LABELS: { key: keyof WestgardRules; label: string; type: "warning" | "rejection" }[] = [
-    { key: "rule1_2s",  label: "1:2s",  type: "warning"   },
-    { key: "rule1_3s",  label: "1:3s",  type: "rejection" },
-    { key: "rule2_2s",  label: "2:2s",  type: "rejection" },
-    { key: "ruleR_4s",  label: "R:4s",  type: "rejection" },
-    { key: "rule3_1s",  label: "3:1s",  type: "warning"   },
-    { key: "rule4_1s",  label: "4:1s",  type: "rejection" },
-    { key: "rule9x",    label: "9x",    type: "rejection" },
-    { key: "rule10x",   label: "10x",   type: "rejection" },
-  ];
+  // SD levels to draw
+  const sdLines = [-3, -2, -1, 0, 1, 2, 3];
 
   return (
-    <div className="w-full space-y-4">
-      {/* Chart */}
+    <div className="w-full space-y-3">
       <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 480 }}>
-          {sd > 0 && bands.map((b, i) => (
-            <rect key={i} x={PAD.left} y={yOf(b.to)} width={PLOT_W}
-              height={Math.max(0, yOf(b.from) - yOf(b.to))} fill={b.fill} opacity={b.opacity} />
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 560 }}>
+
+          {/* Background */}
+          <rect x={PAD.left} y={PAD.top} width={PW} height={PH} fill="none" />
+
+          {/* Vertical column grid (one per data point) */}
+          {pts.map((_, i) => (
+            <line key={`vg-${i}`}
+              x1={xOf(i,n)} y1={PAD.top} x2={xOf(i,n)} y2={PAD.top+PH}
+              stroke="#e2e8f0" strokeWidth="0.7" className="dark:stroke-dark-600/50" />
           ))}
 
-          {sd > 0 && limits.map(l => (
-            <g key={l.label}>
-              <line x1={PAD.left} y1={yOf(l.v)} x2={PAD.left + PLOT_W} y2={yOf(l.v)}
-                stroke={l.color} strokeWidth={l.label === "Mean" ? 1.5 : 1}
-                strokeDasharray={l.dash} />
-              <text x={PAD.left + PLOT_W + 6} y={yOf(l.v) + 3} fontSize="11"
-                fill={l.color} fontWeight="500">{l.label}</text>
-              <text x={PAD.left - 8} y={yOf(l.v) + 3} fontSize="10" textAnchor="end"
-                fill="#94a3b8">{l.v.toFixed(2)}</text>
-            </g>
-          ))}
-
-          {/* Vertical day separator lines */}
-          {points.map((p, i) => {
-            if (i === 0) return null;
-            const prevDay = dayjs(points[i - 1].resultDate).format("YYYY-MM-DD");
-            const thisDay = dayjs(p.resultDate).format("YYYY-MM-DD");
-            if (prevDay === thisDay) return null;
-            const x = (xOf(i) + xOf(i - 1)) / 2;
+          {/* Horizontal SD lines */}
+          {sdLines.map(sd_ => {
+            const y     = yOf(sd_);
+            const isMean = sd_ === 0;
+            const is3s   = Math.abs(sd_) === 3;
+            const is2s   = Math.abs(sd_) === 2;
+            const color  = isMean ? "#3b82f6"
+                         : is3s   ? "#ef4444"
+                         : is2s   ? "#f59e0b"
+                         :          "#94a3b8";
             return (
-              <line key={`sep-${i}`} x1={x} y1={PAD.top} x2={x} y2={PAD.top + PLOT_H}
-                stroke="#94a3b8" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.4" />
+              <g key={`hl-${sd_}`}>
+                <line x1={PAD.left} y1={y} x2={PAD.left+PW} y2={y}
+                  stroke={color}
+                  strokeWidth={isMean ? 1.5 : 0.8}
+                  strokeDasharray={isMean ? "" : is3s ? "4 3" : is2s ? "4 3" : "2 3"} />
+                <text x={PAD.left - 6} y={y + 3.5} textAnchor="end" fontSize="10" fill={color} fontWeight={isMean ? "600" : "400"}>
+                  {sd_ > 0 ? `+${sd_}` : sd_}
+                </text>
+              </g>
             );
           })}
 
-          {points.length > 1 && (
-            <path d={linePath} fill="none" stroke="#64748b" strokeWidth="1.5" opacity="0.6" />
+          {/* Outer boundary lines at ±4 */}
+          {([-4, 4] as const).map(v => (
+            <line key={`b${v}`} x1={PAD.left} y1={yOf(v)} x2={PAD.left+PW} y2={yOf(v)}
+              stroke="#cbd5e1" strokeWidth="0.5" className="dark:stroke-dark-600" />
+          ))}
+
+          {/* Connecting polyline */}
+          {n > 1 && (
+            <polyline points={polylinePoints}
+              fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.8" />
           )}
 
-          {points.map((p, i) => {
+          {/* Data points */}
+          {pts.map((p, i) => {
+            const y       = yOf(zs[i]);
+            const color   = dotColor(i, viols, p.status);
             const isHover = hover === i;
-            const color   = dotColor(i);
-            const hasViol = pointViolType[i] !== null;
+            const hasViol = viols.some(v => v.pointIndices.includes(i));
             return (
-              <g key={p.resultId} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
+              <g key={p.resultId}
+                onMouseEnter={() => setHover(i)}
+                onMouseLeave={() => setHover(null)}
                 style={{ cursor: "pointer" }}>
-                <circle cx={xOf(i)} cy={yOf(p.value)} r="12" fill="transparent" />
-                {/* Pulse ring for violations */}
+                <circle cx={xOf(i,n)} cy={y} r="10" fill="transparent" />
                 {hasViol && (
-                  <circle cx={xOf(i)} cy={yOf(p.value)} r={isHover ? 9 : 8}
-                    fill="none" stroke={color} strokeWidth="1" opacity="0.4" />
+                  <circle cx={xOf(i,n)} cy={y} r={isHover ? 8 : 7}
+                    fill="none" stroke={color} strokeWidth="1" opacity="0.35" />
                 )}
-                <circle cx={xOf(i)} cy={yOf(p.value)} r={isHover ? 6 : 4}
+                <circle cx={xOf(i,n)} cy={y} r={isHover ? 5.5 : 4}
                   fill={color} stroke="#fff" strokeWidth="1.5" />
               </g>
             );
           })}
 
-          {points.map((p, i) =>
-            i % labelStep === 0 ? (
-              <text key={p.resultId} x={xOf(i)} y={H - PAD.bottom + 18} fontSize="10"
-                textAnchor="middle" fill="#94a3b8">
+          {/* X-axis: sequential numbers */}
+          {pts.map((p, i) => {
+            const step = Math.max(1, Math.ceil(n / 20));
+            if (i % step !== 0 && i !== n - 1) return null;
+            return (
+              <text key={`xl-${i}`} x={xOf(i,n)} y={H - PAD.bottom + 14}
+                textAnchor="middle" fontSize="9" fill="#94a3b8">
                 {dayjs(p.resultDate).format("DD/MM")}
               </text>
-            ) : null
-          )}
+            );
+          })}
 
           {/* Tooltip */}
           {hover !== null && (() => {
-            const p  = points[hover];
-            const z  = sd > 0 ? ((p.value - mean) / sd) : 0;
-            const tx = Math.min(Math.max(xOf(hover) - 70, PAD.left), PAD.left + PLOT_W - 148);
-            const ty = Math.max(yOf(p.value) - 86, 4);
-            const viols = violations.filter(v => v.pointIndices.includes(hover));
-            const boxH  = 68 + (viols.length > 0 ? 16 * viols.length + 4 : 0);
+            const p    = pts[hover];
+            const z    = zs[hover];
+            const x    = xOf(hover, n);
+            const y    = yOf(z);
+            const tx   = Math.min(Math.max(x - 72, PAD.left), PAD.left + PW - 148);
+            const ty   = Math.max(y - 72, PAD.top + 2);
+            const pvs  = viols.filter(v => v.pointIndices.includes(hover));
+            const boxH = 62 + pvs.length * 14;
             return (
               <g pointerEvents="none">
-                <rect x={tx} y={ty} width="148" height={boxH} rx="6" fill="#1e293b" opacity="0.96" />
-                <text x={tx + 10} y={ty + 18} fontSize="11" fill="#fff" fontWeight="600">
+                <rect x={tx} y={ty} width={148} height={boxH} rx="5" fill="#0f172a" opacity="0.93" />
+                <text x={tx+8} y={ty+15} fontSize="10" fill="#f1f5f9" fontWeight="600">
                   {dayjs(p.resultDate).format("DD MMM YYYY HH:mm")}
                 </text>
-                <text x={tx + 10} y={ty + 34} fontSize="11" fill="#cbd5e1">
-                  Value: {p.value}  ·  Z: {z.toFixed(2)}
+                <text x={tx+8} y={ty+29} fontSize="10" fill="#94a3b8">
+                  Nilai: {p.value}  ·  Z: {z >= 0 ? "+" : ""}{z.toFixed(2)}
                 </text>
-                <text x={tx + 10} y={ty + 50} fontSize="11" fill={dotColor(hover)} fontWeight="500">
-                  {p.status}{p.westgardFlags ? ` · ${p.westgardFlags}` : ""}
+                <text x={tx+8} y={ty+43} fontSize="10" fill={dotColor(hover, viols, p.status)} fontWeight="500">
+                  {p.status}{p.westgardFlags ? ` (${p.westgardFlags})` : ""}
                 </text>
-                {viols.map((v, k) => (
-                  <text key={k} x={tx + 10} y={ty + 66 + k * 16} fontSize="10"
+                {pvs.map((v, k) => (
+                  <text key={k} x={tx+8} y={ty+57+k*14} fontSize="9"
                     fill={v.type === "rejection" ? "#fca5a5" : "#fcd34d"}>
-                    ▲ {v.rule}
+                    ▲ {v.rule}: {v.msg.split(":")[0]}
                   </text>
                 ))}
               </g>
@@ -292,55 +242,61 @@ export default function LeveyJenningsChart({ data, westgardRules, maxPoints }: P
         </svg>
       </div>
 
-      {/* Active rules + violations panel */}
-      {westgardRules && (
-        <div className="space-y-3">
-          {/* Active rules badges */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-gray-500 dark:text-dark-400">Active rules:</span>
-            {RULE_LABELS.map(r =>
-              westgardRules[r.key] ? (
-                <span key={r.key}
-                  className={`rounded px-2 py-0.5 text-xs font-mono font-medium
-                    ${r.type === "rejection"
-                      ? "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400"
-                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"}`}>
-                  {r.label}
-                </span>
-              ) : null
-            )}
-          </div>
-
-          {/* Violations list */}
-          {violations.length === 0 ? (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/10 dark:text-emerald-400">
-              ✓ All values within control limits — no rule violations detected
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-gray-600 dark:text-dark-300">
-                {violations.length} violation{violations.length !== 1 ? "s" : ""} detected
-              </p>
-              {violations.map((v, i) => (
-                <div key={i}
-                  className={`flex items-start gap-3 rounded-lg border-l-4 px-3 py-2 text-sm
-                    ${v.type === "rejection"
-                      ? "border-red-500 bg-red-50 text-red-800 dark:bg-red-900/10 dark:text-red-300"
-                      : "border-amber-400 bg-amber-50 text-amber-800 dark:bg-amber-900/10 dark:text-amber-300"}`}>
-                  <span className="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-xs font-bold
-                    bg-white/60 dark:bg-black/20">
-                    {v.rule}
-                  </span>
-                  <span>{v.msg}</span>
-                  <span className={`ml-auto shrink-0 text-xs font-medium ${v.type === "rejection" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`}>
-                    {v.type === "rejection" ? "Reject" : "Warning"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+      {/* Violations panel — only on Reports page */}
+      {showViolations && westgardRules && (
+        <div className="space-y-2">
+          {violations_panel(viols, westgardRules)}
         </div>
       )}
     </div>
+  );
+}
+
+// ── Violations panel ──────────────────────────────────────────────────────────
+function violations_panel(viols: Violation[], rules: WestgardRules) {
+  const RULE_LABELS: { key: keyof WestgardRules; label: string; type: "warning"|"rejection" }[] = [
+    { key: "rule1_2s", label: "1:2s",  type: "warning"   },
+    { key: "rule1_3s", label: "1:3s",  type: "rejection" },
+    { key: "rule2_2s", label: "2:2s",  type: "rejection" },
+    { key: "ruleR_4s", label: "R:4s",  type: "rejection" },
+    { key: "rule3_1s", label: "3:1s",  type: "warning"   },
+    { key: "rule4_1s", label: "4:1s",  type: "rejection" },
+    { key: "rule9x",   label: "9x",    type: "rejection" },
+    { key: "rule10x",  label: "10x",   type: "rejection" },
+  ];
+
+  return (
+    <>
+      <div className="flex flex-wrap gap-1.5">
+        <span className="text-xs text-gray-400 dark:text-dark-500 self-center">Rules aktif:</span>
+        {RULE_LABELS.filter(r => rules[r.key]).map(r => (
+          <span key={r.key} className={`rounded px-1.5 py-0.5 font-mono text-xs font-medium
+            ${r.type==="rejection"
+              ? "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+              : "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"}`}>
+            {r.label}
+          </span>
+        ))}
+      </div>
+      {viols.length === 0 ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700
+          dark:border-emerald-800 dark:bg-emerald-900/10 dark:text-emerald-400">
+          ✓ Semua nilai dalam batas kontrol
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {viols.map((v, i) => (
+            <div key={i} className={`flex items-start gap-2 rounded border-l-4 px-2.5 py-1.5 text-xs
+              ${v.type==="rejection"
+                ? "border-red-500 bg-red-50 text-red-800 dark:bg-red-900/10 dark:text-red-300"
+                : "border-amber-400 bg-amber-50 text-amber-800 dark:bg-amber-900/10 dark:text-amber-300"}`}>
+              <span className="shrink-0 rounded bg-white/60 px-1 font-mono font-bold dark:bg-black/20">{v.rule}</span>
+              <span>{v.msg}</span>
+              <span className="ml-auto shrink-0 font-medium">{v.type === "rejection" ? "Reject" : "Warning"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }

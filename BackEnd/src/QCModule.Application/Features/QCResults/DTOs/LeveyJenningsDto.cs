@@ -33,5 +33,10 @@ public record LeveyJenningsDto(
     int                             AcceptedCount,
     int                             WarningCount,
     int                             RejectedCount,
+    // Calculated from last 20 displayed points (vs Quoted = target)
+    double                          CalculatedMean,
+    double                          CalculatedSD,
+    double                          CalculatedCV,
+    int                             DisplayCount,
     IEnumerable<LeveyJenningsPointDto> Points
 );

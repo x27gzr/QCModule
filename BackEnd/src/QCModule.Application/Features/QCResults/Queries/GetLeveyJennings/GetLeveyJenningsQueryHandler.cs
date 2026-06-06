@@ -44,6 +44,15 @@ public class GetLeveyJenningsQueryHandler(
 
         var ordered = filtered.OrderBy(r => r.ResultDate).ToList();
 
+        // Calculated stats from last 20 displayed points
+        var display     = ordered.TakeLast(20).ToList();
+        var displayN    = display.Count;
+        var calcMean    = displayN > 0 ? display.Average(r => r.Value) : 0;
+        var calcSD      = displayN > 1
+            ? Math.Sqrt(display.Sum(r => Math.Pow(r.Value - calcMean, 2)) / (displayN - 1))
+            : 0;
+        var calcCV      = calcMean > 0 ? calcSD / calcMean * 100 : 0;
+
         var points = ordered.Select(r => new LeveyJenningsPointDto(
             r.Id, r.ResultDate, r.Value, r.ZScore, r.Status, r.WestgardFlags));
 
@@ -68,6 +77,10 @@ public class GetLeveyJenningsQueryHandler(
             AcceptedCount:       ordered.Count(r => r.Status == QCStatus.Accepted),
             WarningCount:        ordered.Count(r => r.Status == QCStatus.Warning),
             RejectedCount:       ordered.Count(r => r.Status == QCStatus.Rejected),
+            CalculatedMean:      Math.Round(calcMean, 3),
+            CalculatedSD:        Math.Round(calcSD,   3),
+            CalculatedCV:        Math.Round(calcCV,   2),
+            DisplayCount:        displayN,
             Points:              points);
 
         return Result<LeveyJenningsDto>.Success(dto);

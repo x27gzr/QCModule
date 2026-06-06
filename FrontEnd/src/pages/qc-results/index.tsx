@@ -375,12 +375,12 @@ export default function QCResultsPage() {
   const [validating,  setValidating]  = useState<QCResultSummaryDto | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  // LJ Chart split panel
+  // LJ Chart panel (driven by clicking row in table)
   const [ljSampleId,  setLjSampleId]   = useState("");
-  const [ljTargets,   setLjTargets]    = useState<import("@/services/qcResultService").QCSampleTargetDto[]>([]);
   const [ljParamId,   setLjParamId]    = useState("");
   const [ljData,      setLjData]       = useState<LeveyJenningsDto | null>(null);
   const [ljRules,     setLjRules]      = useState<WestgardRules | null>(null);
+  const [ljSample,    setLjSample]     = useState<import("@/services/qcSampleService").QCSampleDto | null>(null);
   const [ljLoading,   setLjLoading]    = useState(false);
 
   // Filter state
@@ -444,24 +444,20 @@ export default function QCResultsPage() {
   const hasActiveFilters = fInstrument || fSample || fParam || fDateFrom || fDateTo || fValStatus || fDeleted;
 
   const loadChart = async (sampleId: string, paramId: string) => {
+    setLjSampleId(sampleId);
     setLjParamId(paramId);
     setLjLoading(true);
     setLjData(null);
     try {
-      const res = await qcResultService.getLeveyJennings({ qcSampleId: sampleId, testFileParameterId: paramId });
-      setLjData(res.data.data);
+      const [ljRes, sampleRes] = await Promise.all([
+        qcResultService.getLeveyJennings({ qcSampleId: sampleId, testFileParameterId: paramId }),
+        qcSampleService.getById(sampleId),
+      ]);
+      setLjData(ljRes.data.data);
+      setLjRules(sampleRes.data.data.westgardRules);
+      setLjSample(sampleRes.data.data);
     } finally { setLjLoading(false); }
   };
-
-  // When LJ sample changes → load targets + rules
-  useEffect(() => {
-    setLjParamId("");
-    setLjData(null);
-    setLjTargets([]);
-    if (!ljSampleId) return;
-    qcResultService.getTargets(ljSampleId).then(r => setLjTargets(r.data.data));
-    qcSampleService.getById(ljSampleId).then(r => setLjRules(r.data.data.westgardRules));
-  }, [ljSampleId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -729,84 +725,110 @@ export default function QCResultsPage() {
       {cancelling && <CancelValidationModal result={cancelling} onConfirm={handleCancelValidation} onClose={() => setCancelling(null)} />}
       {validating && <ValidateModal result={validating} onValidate={handleValidate} onClose={() => setValidating(null)} />}
 
-      {/* ── Levey-Jennings Split Panel ───────────────────────────────────── */}
+      {/* ── Levey-Jennings Panel (klik icon chart di baris atas) ───────── */}
       <div className="dark:bg-dark-800 dark:border-dark-600 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs">
-        {/* Header: sample selector */}
-        <div className="dark:border-dark-600 flex items-center gap-3 border-b border-gray-100 px-4 py-2.5">
-          <ChartBarIcon className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          <span className="dark:text-dark-300 text-xs font-medium text-gray-500">Levey-Jennings</span>
-          <select
-            value={ljSampleId}
-            onChange={e => setLjSampleId(e.target.value)}
-            className="dark:bg-dark-700 dark:text-dark-100 dark:border-dark-500 ml-1 rounded-lg border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary-500">
-            <option value="">Pilih QC Sample…</option>
-            {allSamples.map(s => (
-              <option key={s.id} value={s.id}>{s.name} — {s.level} (Lot: {s.lotNumber})</option>
-            ))}
-          </select>
-          {ljData?.hasTarget && (
-            <div className="ml-auto flex items-center gap-3 text-xs text-gray-400 dark:text-dark-400">
-              <span>Mean <strong className="text-gray-700 dark:text-dark-200">{ljData.mean.toFixed(2)}</strong></span>
-              <span>SD <strong className="text-gray-700 dark:text-dark-200">{ljData.sd.toFixed(2)}</strong></span>
-              <span>CV <strong className="text-gray-700 dark:text-dark-200">{ljData.cv.toFixed(2)}%</strong></span>
-              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-emerald-500" />{ljData.acceptedCount}</span>
-              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-amber-500" />{ljData.warningCount}</span>
-              <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-red-500" />{ljData.rejectedCount}</span>
+        {!ljParamId ? (
+          /* Placeholder */
+          <div className="flex h-32 flex-col items-center justify-center gap-2 text-center">
+            <ChartBarIcon className="size-8 text-gray-200 dark:text-dark-600" />
+            <p className="text-sm text-gray-400 dark:text-dark-500">
+              Klik icon <ChartBarIcon className="inline size-3.5 text-emerald-500" /> pada baris hasil di atas untuk menampilkan Levey-Jennings Chart
+            </p>
+          </div>
+        ) : ljLoading ? (
+          <div className="flex h-48 items-center justify-center">
+            <div className="border-primary-500 size-7 animate-spin rounded-full border-4 border-t-transparent" />
+          </div>
+        ) : ljData && (
+          <>
+            {/* Chart title bar */}
+            <div className="dark:border-dark-600 border-b border-gray-100 px-5 py-2.5 text-center">
+              <span className="dark:text-dark-100 text-sm font-semibold text-gray-700">
+                {ljData.parameterName}{ljData.unit ? ` (${ljData.unit})` : ""} — {ljData.level}
+              </span>
             </div>
-          )}
-        </div>
 
-        {/* Split body */}
-        <div className="flex h-[440px]">
-          {/* Left: parameter list (scrollable) */}
-          <div className="dark:border-dark-600 w-44 shrink-0 overflow-y-auto border-r border-gray-100">
-            {!ljSampleId ? (
-              <p className="p-3 text-xs text-gray-400 dark:text-dark-500">Pilih sample dulu</p>
-            ) : ljTargets.length === 0 ? (
-              <p className="p-3 text-xs text-gray-400 dark:text-dark-500">Belum ada target</p>
-            ) : ljTargets.map(t => (
-              <button key={t.testFileParameterId}
-                onClick={() => loadChart(ljSampleId, t.testFileParameterId)}
-                className={`w-full px-3 py-2.5 text-left transition-colors
-                  ${ljParamId === t.testFileParameterId
-                    ? "bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300 font-semibold border-l-2 border-primary-500"
-                    : "text-gray-600 dark:text-dark-300 hover:bg-gray-50 dark:hover:bg-dark-700 border-l-2 border-transparent"}`}>
-                <p className="text-xs font-medium">{t.parameterName}</p>
-                {t.unit && <p className="text-[10px] text-gray-400 dark:text-dark-500">{t.unit}</p>}
-              </button>
-            ))}
-          </div>
+            {/* Split: info kiri + chart kanan */}
+            <div className="flex">
+              {/* ── Kiri: info panel ────────────────────────────────────── */}
+              <div className="dark:border-dark-600 dark:text-dark-300 w-52 shrink-0 border-r border-gray-100 p-4 text-xs text-gray-600">
+                <div className="space-y-1">
+                  <div><span className="text-gray-400">Lot No</span><span className="float-right font-medium">{ljSample?.lotNumber ?? "—"}</span></div>
+                  <div><span className="text-gray-400">Exp Date</span><span className="float-right font-medium">{ljSample ? dayjs(ljSample.expiryDate).format("DD-MM-YYYY") : "—"}</span></div>
+                  <div><span className="text-gray-400">N Result</span><span className="float-right font-medium">{ljData.displayCount}</span></div>
+                </div>
 
-          {/* Right: LJ Chart (fixed, no scroll) */}
-          <div className="min-w-0 flex-1 overflow-hidden p-4">
-            {!ljSampleId || !ljParamId ? (
-              <div className="flex h-full flex-col items-center justify-center text-center">
-                <ChartBarIcon className="mb-2 size-10 text-gray-200 dark:text-dark-600" />
-                <p className="text-sm text-gray-400 dark:text-dark-500">
-                  {!ljSampleId ? "Pilih QC Sample" : "Klik parameter di sebelah kiri"}
-                </p>
+                <div className="mt-3">
+                  <div className="mb-1 grid grid-cols-3 gap-1 text-[10px] text-gray-400">
+                    <span></span><span className="text-center">Quoted</span><span className="text-center">Calc</span>
+                  </div>
+                  {[
+                    { label: "Mean", q: ljData.mean.toFixed(2),          c: ljData.calculatedMean.toFixed(2) },
+                    { label: "SD",   q: ljData.sd.toFixed(2),            c: ljData.calculatedSD.toFixed(2) },
+                    { label: "CV",   q: `${ljData.cv.toFixed(2)}%`,      c: `${ljData.calculatedCV.toFixed(2)}%` },
+                  ].map(r => (
+                    <div key={r.label} className="grid grid-cols-3 gap-1 border-b border-gray-50 py-0.5 dark:border-dark-700">
+                      <span className="text-gray-400">{r.label}</span>
+                      <span className="text-center font-medium text-blue-600 dark:text-blue-400">{r.q}</span>
+                      <span className="text-center font-medium text-gray-700 dark:text-dark-200">{r.c}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Status counts */}
+                <div className="mt-3 space-y-0.5">
+                  <div className="flex justify-between"><span className="text-gray-400">Accepted</span><span className="font-medium text-emerald-600">{ljData.acceptedCount}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Warning</span><span className="font-medium text-amber-500">{ljData.warningCount}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">Rejected</span><span className="font-medium text-red-600">{ljData.rejectedCount}</span></div>
+                </div>
+
+                {/* Active rules */}
+                {ljRules && (
+                  <div className="mt-3">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Rules Aktif</p>
+                    <div className="space-y-0.5">
+                      {([
+                        { key: "rule1_2s" as const,  label: "Warning: outside 2SD",   w: true  },
+                        { key: "rule1_3s" as const,  label: "Rejection: outside 3SD", w: false },
+                        { key: "rule2_2s" as const,  label: "2x outside 2SD",         w: false },
+                        { key: "ruleR_4s" as const,  label: "2x different > 4SD",     w: false },
+                        { key: "rule3_1s" as const,  label: "3x outside 1SD",         w: true  },
+                        { key: "rule4_1s" as const,  label: "4x outside 1SD",         w: false },
+                        { key: "rule9x"   as const,  label: "9x same side of mean",   w: false },
+                        { key: "rule10x"  as const,  label: "10x same side of mean",  w: false },
+                      ] as const).filter(r => ljRules[r.key]).map(r => (
+                        <p key={r.key} className={r.w ? "text-amber-600 dark:text-amber-400" : "text-gray-600 dark:text-dark-300"}>
+                          — {r.label}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            ) : ljLoading ? (
-              <div className="flex h-full items-center justify-center">
-                <div className="border-primary-500 size-7 animate-spin rounded-full border-4 border-t-transparent" />
+
+              {/* ── Kanan: Z-score chart ─────────────────────────────── */}
+              <div className="min-w-0 flex-1 p-3">
+                {!ljData.hasTarget ? (
+                  <div className="flex h-full flex-col items-center justify-center text-center">
+                    <ExclamationTriangleIcon className="mb-2 size-8 text-amber-400" />
+                    <p className="text-sm text-gray-500 dark:text-dark-400">Belum ada target (Mean/SD)</p>
+                  </div>
+                ) : ljData.points.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center">
+                    <p className="text-sm text-gray-400 dark:text-dark-500">Belum ada data QC</p>
+                  </div>
+                ) : (
+                  <LeveyJenningsChart
+                    data={ljData}
+                    westgardRules={ljRules ?? undefined}
+                    maxPoints={20}
+                    showViolations={false}
+                  />
+                )}
               </div>
-            ) : !ljData ? null
-            : !ljData.hasTarget ? (
-              <div className="flex h-full flex-col items-center justify-center text-center">
-                <ExclamationTriangleIcon className="mb-2 size-9 text-amber-400" />
-                <p className="text-sm font-medium text-gray-700 dark:text-dark-300">Belum ada target (Mean/SD)</p>
-                <p className="mt-1 text-xs text-gray-400">Set di QC Samples → Targets</p>
-              </div>
-            ) : ljData.points.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center text-center">
-                <ChartBarIcon className="mb-2 size-9 text-gray-200 dark:text-dark-600" />
-                <p className="text-sm text-gray-400 dark:text-dark-500">Belum ada data QC</p>
-              </div>
-            ) : (
-              <LeveyJenningsChart data={ljData} westgardRules={ljRules ?? undefined} maxPoints={20} />
-            )}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

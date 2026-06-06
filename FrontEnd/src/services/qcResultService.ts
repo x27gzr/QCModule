@@ -86,6 +86,10 @@ export interface LeveyJenningsDto {
   acceptedCount: number;
   warningCount: number;
   rejectedCount: number;
+  calculatedMean: number;
+  calculatedSD: number;
+  calculatedCV: number;
+  displayCount: number;
   points: LeveyJenningsPoint[];
 }
 
