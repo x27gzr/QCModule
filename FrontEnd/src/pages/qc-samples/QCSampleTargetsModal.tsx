@@ -9,7 +9,8 @@ interface TargetRow {
   unit:          string | null;
   testFileName:  string;
   mean:          string;
-  sd:            string;
+  sdValue:       string;  // nilai dari assay sheet (mis. 2SD)
+  sdMultiplier:  string;  // berapa kali SD (1/2/3)
   cv:            string;
   tea:           string;
   teaUnit:       string;
@@ -49,13 +50,16 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
       const built: TargetRow[] = testFiles.flatMap(tf =>
         tf.parameters.map((p: TestFileParameterDto) => {
           const existing = targetMap[p.id];
+          // Reverse: stored sd is 1SD, default assume assay sheet had 2SD → sdValue = sd×2
+          const sd1 = existing?.sd ?? 0;
           return {
             parameterId:   p.id,
             parameterName: p.parameterName,
             unit:          p.unit,
             testFileName:  tf.name,
             mean:          existing ? String(existing.mean) : "",
-            sd:            existing ? String(existing.sd)   : "",
+            sdValue:       existing ? String(sd1 * 2) : "",
+            sdMultiplier:  "2",
             cv:            existing ? String(existing.cv)   : "",
             tea:           existing?.tea != null ? String(existing.tea) : "",
             teaUnit:       existing?.teaUnit ?? "%",
@@ -75,15 +79,23 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
 
   useEffect(() => { load(); }, [load]);
 
-  const update = (parameterId: string, field: "mean" | "sd" | "cv" | "tea" | "teaUnit", value: string) => {
+  const calc1SD = (sdValue: string, sdMultiplier: string) => {
+    const v = parseFloat(sdValue);
+    const m = parseFloat(sdMultiplier) || 1;
+    return (v && m) ? v / m : NaN;
+  };
+
+  const update = (parameterId: string, field: "mean" | "sdValue" | "sdMultiplier" | "cv" | "tea" | "teaUnit", value: string) => {
     setRows(prev => prev.map(r => {
       if (r.parameterId !== parameterId) return r;
       const next = { ...r, [field]: value, saved: false, error: null };
-      // Auto-calculate CV when mean or sd changes
-      if ((field === "mean" || field === "sd")) {
-        const m = parseFloat(field === "mean" ? value : r.mean);
-        const s = parseFloat(field === "sd"   ? value : r.sd);
-        if (m && s && m !== 0) next.cv = ((s / m) * 100).toFixed(2);
+      // Recalculate CV when mean, sdValue, or sdMultiplier changes
+      if (field === "mean" || field === "sdValue" || field === "sdMultiplier") {
+        const mean = parseFloat(field === "mean" ? value : r.mean);
+        const sdVal = field === "sdValue"      ? value : r.sdValue;
+        const sdMul = field === "sdMultiplier" ? value : r.sdMultiplier;
+        const sd1   = calc1SD(sdVal, sdMul);
+        if (mean && !isNaN(sd1) && mean !== 0) next.cv = ((sd1 / mean) * 100).toFixed(2);
       }
       return next;
     }));
@@ -91,12 +103,12 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
 
   const save = async (row: TargetRow) => {
     const mean = parseFloat(row.mean);
-    const sd   = parseFloat(row.sd);
+    const sd   = calc1SD(row.sdValue, row.sdMultiplier);
     const cv   = parseFloat(row.cv);
 
-    if (!mean || !sd || !cv || mean === 0 || sd <= 0 || cv <= 0) {
+    if (!mean || isNaN(sd) || !cv || mean === 0 || sd <= 0 || cv <= 0) {
       setRows(prev => prev.map(r => r.parameterId === row.parameterId
-        ? { ...r, error: "Mean, SD and CV must be valid numbers greater than zero." } : r));
+        ? { ...r, error: "Mean, SD value, and CV must be valid numbers greater than zero." } : r));
       return;
     }
 
@@ -106,7 +118,7 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
     try {
       await qcResultService.upsertTarget(qcSampleId, {
         testFileParameterId: row.parameterId,
-        mean, sd, cv,
+        mean, sd, cv,  // sd sudah 1SD hasil perhitungan
         tea:     tea && !isNaN(tea) ? tea : undefined,
         teaUnit: row.teaUnit || "%",
       });
@@ -157,10 +169,10 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
                   </h3>
 
                   {/* Column headers */}
-                  <div className="mb-1 grid grid-cols-[2fr_1fr_1fr_1fr_1fr_4rem_3.5rem] gap-2 px-3 text-xs font-medium text-gray-400 dark:text-dark-500">
+                  <div className="mb-1 grid grid-cols-[2fr_1fr_2fr_1fr_1fr_4rem_3.5rem] gap-2 px-3 text-xs font-medium text-gray-400 dark:text-dark-500">
                     <span>Parameter</span>
                     <span>Mean</span>
-                    <span>SD</span>
+                    <span>[x] × SD</span>
                     <span>CV (%)</span>
                     <span>TEA</span>
                     <span>Unit</span>
@@ -169,7 +181,7 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
 
                   <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 dark:divide-dark-600 dark:border-dark-600">
                     {groupRows.map(row => (
-                      <div key={row.parameterId} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_4rem_3.5rem] items-center gap-2 px-3 py-2.5">
+                      <div key={row.parameterId} className="grid grid-cols-[2fr_1fr_2fr_1fr_1fr_4rem_3.5rem] items-center gap-2 px-3 py-2.5">
                         {/* Parameter name */}
                         <div>
                           <p className="text-sm font-medium text-gray-800 dark:text-dark-100 flex items-center gap-1.5">
@@ -185,11 +197,21 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
                           placeholder="0.00"
                           className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
 
-                        {/* SD */}
-                        <input type="number" step="any" value={row.sd}
-                          onChange={e => update(row.parameterId, "sd", e.target.value)}
-                          placeholder="0.00"
-                          className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+                        {/* [multiplier] × [sd value] → 1SD otomatis */}
+                        <div className="flex items-center gap-1">
+                          <select value={row.sdMultiplier}
+                            onChange={e => update(row.parameterId, "sdMultiplier", e.target.value)}
+                            className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 w-12 shrink-0 rounded-lg border border-gray-200 px-1 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                          </select>
+                          <span className="shrink-0 text-xs text-gray-400">×</span>
+                          <input type="number" step="any" value={row.sdValue}
+                            onChange={e => update(row.parameterId, "sdValue", e.target.value)}
+                            placeholder="0.00"
+                            className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50" />
+                        </div>
 
                         {/* CV */}
                         <input type="number" step="any" value={row.cv}
@@ -240,7 +262,7 @@ export default function QCSampleTargetsModal({ qcSampleId, sampleName, onClose }
         {/* Footer */}
         <div className="border-t border-gray-100 px-6 py-3 dark:border-dark-600">
           <p className="dark:text-dark-400 text-xs text-gray-400">
-            CV is auto-calculated from Mean and SD. TEA = Total Allowable Error (optional). Click <strong>Save</strong> per row to update.
+            [x] × SD = nilai dari assay sheet (mis. 2×0.4 → 1SD=0.2). CV dihitung otomatis. TEA opsional. Klik <strong>Save</strong> per baris.
             <span className="ml-2 inline-flex items-center gap-1">
               <span className="inline-block size-1.5 rounded-full bg-emerald-500" /> = target already set
             </span>
