@@ -9,6 +9,13 @@ export interface LoginCustomization {
   appSubtitle: string;
 }
 
+export interface FileWatcherSettings {
+  enabled: boolean;
+  folderPath: string;
+  archivePath: string;
+  intervalSeconds: number;
+}
+
 // Shared visual mappings used by both the Settings editor and the SignIn page.
 export const BACKGROUND_PRESETS: Record<string, string> = {
   "gradient-blue":    "bg-gradient-to-br from-blue-500 to-indigo-600",
@@ -41,6 +48,12 @@ const settingsService = {
 
   resetLoginCustomization: () =>
     api.post<{ data: LoginCustomization }>("/api/settings/login-customization/reset"),
+
+  getFileWatcherSettings: () =>
+    api.get<{ data: FileWatcherSettings }>("/api/settings/file-watcher"),
+
+  updateFileWatcherSettings: (payload: FileWatcherSettings) =>
+    api.put<{ data: FileWatcherSettings }>("/api/settings/file-watcher", payload),
 };
 
 export default settingsService;

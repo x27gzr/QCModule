@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QCModule.Application.Common.Authorization;
 using QCModule.Application.Common.Models;
+using QCModule.Application.Features.Settings.Commands.UpdateFileWatcherSettings;
 using QCModule.Application.Features.Settings.Commands.UpdateLoginCustomization;
 using QCModule.Application.Features.Settings.DTOs;
+using QCModule.Application.Features.Settings.Queries.GetFileWatcherSettings;
 using QCModule.Application.Features.Settings.Queries.GetLoginCustomization;
 
 namespace QCModule.API.Controllers;
@@ -29,4 +31,15 @@ public class SettingsController(IMediator mediator) : ControllerBase
     [HttpPost("login-customization/reset")]
     public async Task<ActionResult<Result<LoginCustomizationDto>>> ResetLoginCustomization(CancellationToken ct)
         => Ok(await mediator.Send(new ResetLoginCustomizationCommand(), ct));
+
+    [Authorize(Policy = Permissions.Settings.Manage)]
+    [HttpGet("file-watcher")]
+    public async Task<ActionResult<Result<FileWatcherSettingsDto>>> GetFileWatcherSettings(CancellationToken ct)
+        => Ok(await mediator.Send(new GetFileWatcherSettingsQuery(), ct));
+
+    [Authorize(Policy = Permissions.Settings.Manage)]
+    [HttpPut("file-watcher")]
+    public async Task<ActionResult<Result<FileWatcherSettingsDto>>> UpdateFileWatcherSettings(
+        [FromBody] UpdateFileWatcherSettingsCommand command, CancellationToken ct)
+        => Ok(await mediator.Send(command, ct));
 }

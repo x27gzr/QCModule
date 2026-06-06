@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { CheckCircleIcon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, FolderIcon, ArchiveBoxIcon } from "@heroicons/react/24/outline";
 import settingsService, {
   type LoginCustomization,
+  type FileWatcherSettings,
   BACKGROUND_PRESETS, CIRCLE_COLORS, LOGO_SIZES,
 } from "@/services/settingsService";
 import Logo from "@/assets/appLogo.svg?react";
+import { toast } from "sonner";
 
 const PRESET_LABELS: Record<string, string> = {
   "gradient-blue": "Blue", "gradient-purple": "Purple", "gradient-emerald": "Emerald", "gradient-slate": "Slate",
@@ -18,11 +20,19 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  const [fw, setFw]           = useState<FileWatcherSettings | null>(null);
+  const [fwSaving, setFwSaving] = useState(false);
+  const [fwSaved, setFwSaved]   = useState(false);
+
   const load = () => {
     setLoading(true);
-    settingsService.getLoginCustomization()
-      .then(r => setForm(r.data.data))
-      .finally(() => setLoading(false));
+    Promise.all([
+      settingsService.getLoginCustomization(),
+      settingsService.getFileWatcherSettings(),
+    ]).then(([lc, fw]) => {
+      setForm(lc.data.data);
+      setFw(fw.data.data);
+    }).finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
 
@@ -49,11 +59,97 @@ export default function SettingsPage() {
     } finally { setSaving(false); }
   };
 
-  if (loading || !form) {
+  const setFwField = <K extends keyof FileWatcherSettings>(key: K, value: FileWatcherSettings[K]) => {
+    setFw(f => f ? { ...f, [key]: value } : f);
+    setFwSaved(false);
+  };
+
+  const saveFw = async () => {
+    if (!fw) return;
+    setFwSaving(true);
+    try {
+      await settingsService.updateFileWatcherSettings(fw);
+      setFwSaved(true);
+      toast.success("File watcher settings saved.");
+    } catch {
+      toast.error("Failed to save file watcher settings.");
+    } finally { setFwSaving(false); }
+  };
+
+  if (loading || !form || !fw) {
     return <div className="flex h-64 items-center justify-center"><div className="border-primary-500 size-7 animate-spin rounded-full border-4 border-t-transparent" /></div>;
   }
 
   return (
+    <div className="space-y-6">
+
+    {/* ── File Watcher ──────────────────────────────────────────────────────── */}
+    <div className="dark:bg-dark-800 dark:border-dark-600 border-gray-150 rounded-xl border bg-white p-6 shadow-xs">
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <h3 className="dark:text-dark-100 text-base font-semibold text-gray-800">Auto Import — File Watcher</h3>
+          <p className="dark:text-dark-400 text-sm text-gray-500">Monitors a folder for .res files sent by analyzers and imports results automatically.</p>
+        </div>
+        <button
+          onClick={() => setFwField("enabled", !fw.enabled)}
+          className={`relative h-6 w-11 rounded-full transition ${fw.enabled ? "bg-primary-600" : "bg-gray-300 dark:bg-dark-600"}`}>
+          <span className="absolute top-0.5 size-5 rounded-full bg-white transition" style={{ left: fw.enabled ? "1.375rem" : "0.125rem" }} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="dark:text-dark-300 mb-1 flex items-center gap-1 text-sm font-medium text-gray-600">
+            <FolderIcon className="size-4" /> Watch Folder Path
+          </label>
+          <input
+            value={fw.folderPath}
+            onChange={e => setFwField("folderPath", e.target.value)}
+            placeholder="e.g. C:\Analyzer\Output"
+            className={inputCls}
+          />
+          <p className="dark:text-dark-500 mt-1 text-xs text-gray-400">New .res files will be picked up from this folder.</p>
+        </div>
+        <div>
+          <label className="dark:text-dark-300 mb-1 flex items-center gap-1 text-sm font-medium text-gray-600">
+            <ArchiveBoxIcon className="size-4" /> Archive Folder Path
+          </label>
+          <input
+            value={fw.archivePath}
+            onChange={e => setFwField("archivePath", e.target.value)}
+            placeholder="e.g. C:\Analyzer\Archive"
+            className={inputCls}
+          />
+          <p className="dark:text-dark-500 mt-1 text-xs text-gray-400">Processed files are moved here. Failed files go to an <code>errors/</code> subfolder.</p>
+        </div>
+        <div>
+          <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">Fetch Interval (seconds)</label>
+          <input
+            type="number"
+            min={5}
+            max={3600}
+            value={fw.intervalSeconds}
+            onChange={e => setFwField("intervalSeconds", Math.max(5, Number(e.target.value)))}
+            className={inputCls}
+          />
+          <p className="dark:text-dark-500 mt-1 text-xs text-gray-400">How often to scan the folder. Minimum 5 seconds.</p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex items-center gap-3">
+        <button onClick={saveFw} disabled={fwSaving}
+          className="bg-primary-600 hover:bg-primary-700 rounded-lg px-5 py-2 text-sm font-medium text-white disabled:opacity-60">
+          {fwSaving ? "Saving…" : "Save Settings"}
+        </button>
+        {fwSaved && <span className="flex items-center gap-1 text-sm text-emerald-600"><CheckCircleIcon className="size-4" />Saved</span>}
+        {fw.enabled && (
+          <span className="ml-auto rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+            Watcher Active
+          </span>
+        )}
+      </div>
+    </div>
+
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {/* Editor */}
       <div className="dark:bg-dark-800 dark:border-dark-600 border-gray-150 space-y-5 rounded-xl border bg-white p-6 shadow-xs">
@@ -157,6 +253,7 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

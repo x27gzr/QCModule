@@ -9,9 +9,9 @@ public class QCResult : BaseEntity
     public Guid TestFileParameterId { get; set; }
     public TestFileParameter TestFileParameter { get; set; } = null!;
 
-    // Analyst who entered the result
-    public Guid UserId { get; set; }
-    public User User { get; set; } = null!;
+    // Analyst who entered the result (null = auto-imported from machine file)
+    public Guid? UserId { get; set; }
+    public User? User { get; set; }
 
     public DateTime ResultDate { get; set; }
     public double Value { get; set; }

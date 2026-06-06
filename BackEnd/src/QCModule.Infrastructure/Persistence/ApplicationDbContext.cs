@@ -63,12 +63,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             };
 
             e.HasData(
-                Seed("b1000001-0000-0000-0000-000000000001", "login_background_preset", "gradient-blue"),
-                Seed("b1000001-0000-0000-0000-000000000002", "login_circle_color",      "blue"),
-                Seed("b1000001-0000-0000-0000-000000000003", "login_show_circle",        "true"),
-                Seed("b1000001-0000-0000-0000-000000000004", "login_logo_size",          "medium"),
-                Seed("b1000001-0000-0000-0000-000000000005", "app_title",                "QC Module"),
-                Seed("b1000001-0000-0000-0000-000000000006", "app_subtitle",             "Laboratory Quality Control")
+                Seed("b1000001-0000-0000-0000-000000000001", "login_background_preset",       "gradient-blue"),
+                Seed("b1000001-0000-0000-0000-000000000002", "login_circle_color",            "blue"),
+                Seed("b1000001-0000-0000-0000-000000000003", "login_show_circle",             "true"),
+                Seed("b1000001-0000-0000-0000-000000000004", "login_logo_size",               "medium"),
+                Seed("b1000001-0000-0000-0000-000000000005", "app_title",                     "QC Module"),
+                Seed("b1000001-0000-0000-0000-000000000006", "app_subtitle",                  "Laboratory Quality Control"),
+                Seed("c1000001-0000-0000-0000-000000000001", "file_watcher_enabled",          "false"),
+                Seed("c1000001-0000-0000-0000-000000000002", "file_watcher_folder_path",      ""),
+                Seed("c1000001-0000-0000-0000-000000000003", "file_watcher_archive_path",     ""),
+                Seed("c1000001-0000-0000-0000-000000000004", "file_watcher_interval_seconds", "30")
             );
         });
 
@@ -143,10 +147,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // ── QCResult approval relationships (3 FKs to User) ───────────────────
         modelBuilder.Entity<QCResult>(e =>
         {
-            // Entry author — keep the existing User.QCResults inverse collection
+            // Entry author — nullable when auto-imported from machine
             e.HasOne(r => r.User)
              .WithMany(u => u.QCResults)
              .HasForeignKey(r => r.UserId)
+             .IsRequired(false)
              .OnDelete(DeleteBehavior.Restrict);
 
             // Analyst validator (no inverse collection)

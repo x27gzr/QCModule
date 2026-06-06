@@ -621,7 +621,13 @@ export default function QCResultsPage() {
                   <p className="text-sm font-medium text-gray-800 dark:text-dark-100">{r.parameterName}{r.unit ? ` (${r.unit})` : ""}</p>
                   <p className="text-xs text-gray-400 dark:text-dark-400">{r.qcSampleName} · {r.level}</p>
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-500 dark:text-dark-400">{dayjs(r.resultDate).format("DD MMM YYYY HH:mm")}</td>
+                <td className="px-4 py-3">
+                  <p className="text-xs text-gray-500 dark:text-dark-400">{dayjs(r.resultDate).format("DD MMM YYYY HH:mm")}</p>
+                  {r.enteredByName
+                    ? <p className="text-xs text-gray-400 dark:text-dark-500">{r.enteredByName}</p>
+                    : <span className="inline-block rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">Auto Import</span>
+                  }
+                </td>
                 <td className="px-4 py-3">
                   <span className="font-mono text-sm font-medium text-gray-800 dark:text-dark-100">{r.value}</span>
                   {r.zScore !== 0 && <span className="ml-2"><ZScoreBadge z={r.zScore} /></span>}

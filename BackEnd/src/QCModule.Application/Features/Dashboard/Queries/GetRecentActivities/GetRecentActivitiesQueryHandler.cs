@@ -56,7 +56,7 @@ public class GetRecentActivitiesQueryHandler(
                 else
                 {
                     action       = "Entered";
-                    userName     = userMap.GetValueOrDefault(r.UserId, "Unknown");
+                    userName     = r.UserId.HasValue ? userMap.GetValueOrDefault(r.UserId.Value, "Unknown") : "Auto Import";
                     activityTime = r.CreatedAt;
                 }
 

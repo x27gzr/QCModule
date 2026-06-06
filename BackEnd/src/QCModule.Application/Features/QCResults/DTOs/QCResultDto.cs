@@ -25,6 +25,7 @@ public record QCResultSummaryDto(
     string              Level,
     string              ParameterName,
     string?             Unit,
+    string?             EnteredByName,
     DateTime            ResultDate,
     double              Value,
     double              ZScore,

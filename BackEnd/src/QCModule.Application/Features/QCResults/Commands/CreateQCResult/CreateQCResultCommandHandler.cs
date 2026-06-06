@@ -29,7 +29,7 @@ public class CreateQCResultCommandHandler(
         var param   = params_.FirstOrDefault() ?? throw new NotFoundException("Test File Parameter", request.TestFileParameterId);
 
         var userId = currentUser.UserId ?? throw new UnauthorizedAccessException("User not authenticated.");
-        var users  = await userRepo.FindAsync(u => u.Id == userId, cancellationToken);
+        var users  = await userRepo.FindAsync(u => u.Id == userId && !u.IsDeleted, cancellationToken);
         var user   = users.FirstOrDefault() ?? throw new NotFoundException("User", userId);
 
         // Look up QCSampleTarget for Z-score calculation

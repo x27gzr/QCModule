@@ -11,6 +11,7 @@ export interface QCResultSummaryDto {
   level: string;
   parameterName: string;
   unit: string | null;
+  enteredByName: string | null;
   resultDate: string;
   value: number;
   zScore: number;

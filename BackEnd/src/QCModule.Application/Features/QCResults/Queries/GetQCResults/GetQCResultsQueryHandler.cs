@@ -53,6 +53,7 @@ public class GetQCResultsQueryHandler(
                 return new QCResultSummaryDto(
                     r.Id, s?.Name ?? "?", s?.Level ?? "?",
                     p?.ParameterName ?? "?", p?.Unit,
+                    r.UserId.HasValue ? userMap.GetValueOrDefault(r.UserId.Value) : null,
                     r.ResultDate, r.Value, r.ZScore, r.Status, r.WestgardFlags,
                     r.ValidationStatus,
                     r.ValidatedBy.HasValue  ? userMap.GetValueOrDefault(r.ValidatedBy.Value)  : null,

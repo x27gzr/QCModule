@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IWestgardService, WestgardService>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
+        services.AddHostedService<ResFileWatcherService>();
 
         return services;
     }
