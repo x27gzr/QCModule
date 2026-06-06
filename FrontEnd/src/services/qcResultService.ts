@@ -110,6 +110,9 @@ const qcResultService = {
     comment?: string;
   }) => api.post<{ data: QCResultDto; message: string }>("/api/qcresults", payload),
 
+  update: (id: string, payload: { resultDate: string; value: number; comment?: string }) =>
+    api.put<{ data: QCResultDto }>(`/api/qcresults/${id}`, payload),
+
   // Stage 1 — analyst
   validate: (id: string, payload: { reject: boolean; note?: string }) =>
     api.post(`/api/qcresults/${id}/validate`, payload),

@@ -1,0 +1,248 @@
+
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; }
+.lj-wrap { padding: 1rem 0; font-family: var(--font-sans); }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; align-items: center; }
+.ctrl-group { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-text-secondary); }
+select, input[type=number] { font-size: 13px; padding: 4px 8px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); color: var(--color-text-primary); width: 90px; }
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+.metric { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 14px; }
+.metric-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.metric-value { font-size: 18px; font-weight: 500; color: var(--color-text-primary); }
+.metric-sub { font-size: 11px; color: var(--color-text-secondary); }
+.chart-wrap { position: relative; width: 100%; height: 320px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: 11px; color: var(--color-text-secondary); }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-line { width: 22px; height: 2px; }
+.violations { margin-top: 14px; }
+.violation-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 8px; }
+.viol-list { display: flex; flex-direction: column; gap: 5px; }
+.viol-item { font-size: 12px; padding: 5px 10px; border-radius: var(--border-radius-md); border-left: 3px solid; }
+.viol-warn { background: #FAEEDA; color: #854F0B; border-color: #EF9F27; }
+.viol-error { background: #FCEBEB; color: #A32D2D; border-color: #E24B4A; }
+@media (prefers-color-scheme: dark) {
+  .viol-warn { background: #633806; color: #FAC775; border-color: #EF9F27; }
+  .viol-error { background: #501313; color: #F09595; border-color: #E24B4A; }
+}
+.no-viol { font-size: 12px; color: var(--color-text-success); background: var(--color-background-success); padding: 5px 10px; border-radius: var(--border-radius-md); border-left: 3px solid var(--color-border-success); }
+</style>
+
+<div class="lj-wrap">
+  <h2 class="sr-only">Levey-Jennings Quality Control Chart</h2>
+
+  <div class="controls">
+    <div class="ctrl-group">
+      <label>Analit</label>
+      <select id="analyt" onchange="switchAnalyte()">
+        <option value="hb">Hemoglobin</option>
+        <option value="glc">Glukosa</option>
+        <option value="crea">Kreatinin</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>Level</label>
+      <select id="level">
+        <option>Level 1 (Normal)</option>
+        <option>Level 2 (Abnormal)</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>Mean</label>
+      <input type="number" id="meanInput" value="14.2" step="0.1" onchange="recalc()">
+    </div>
+    <div class="ctrl-group">
+      <label>SD</label>
+      <input type="number" id="sdInput" value="0.35" step="0.01" onchange="recalc()">
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><div class="metric-label">Mean Target</div><div class="metric-value" id="mMean">14.20</div><div class="metric-sub">g/dL</div></div>
+    <div class="metric"><div class="metric-label">SD</div><div class="metric-value" id="mSD">0.35</div><div class="metric-sub">g/dL</div></div>
+    <div class="metric"><div class="metric-label">%CV</div><div class="metric-value" id="mCV">2.46</div><div class="metric-sub">%</div></div>
+    <div class="metric"><div class="metric-label">Status</div><div class="metric-value" id="mStatus" style="font-size:14px;">In Control</div><div class="metric-sub" id="mViolCount">0 pelanggaran</div></div>
+  </div>
+
+  <div class="chart-wrap">
+    <canvas id="ljChart" role="img" aria-label="Levey-Jennings control chart menampilkan data QC harian dengan garis kontrol"></canvas>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-line" style="background:#E24B4A;"></div> ±3SD (Action)</div>
+    <div class="legend-item"><div class="legend-line" style="background:#EF9F27; border-top: 2px dashed #EF9F27; height:0;"></div> ±2SD (Warning)</div>
+    <div class="legend-item"><div class="legend-line" style="background:#1D9E75;"></div> ±1SD</div>
+    <div class="legend-item"><div class="legend-line" style="background:#178ADD; border-top: 2px solid #178ADD; height:0;"></div> Mean</div>
+    <div class="legend-item"><span style="width:10px;height:10px;border-radius:50%;background:#E24B4A;display:inline-block;"></span> Reject (13s)</div>
+    <div class="legend-item"><span style="width:10px;height:10px;border-radius:50%;background:#EF9F27;display:inline-block;"></span> Warning (22s)</div>
+    <div class="legend-item"><span style="width:10px;height:10px;border-radius:50%;background:#1D9E75;display:inline-block;"></span> In Control</div>
+  </div>
+
+  <div class="violations" id="violBox"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const analytes = {
+  hb:   { mean: 14.2, sd: 0.35, unit: 'g/dL',   name: 'Hemoglobin' },
+  glc:  { mean: 100,  sd: 3.2,  unit: 'mg/dL',  name: 'Glukosa' },
+  crea: { mean: 1.05, sd: 0.04, unit: 'mg/dL',  name: 'Kreatinin' },
+};
+
+function genData(mean, sd, n=20) {
+  const d = [];
+  for (let i=0;i<n;i++) {
+    const u1=Math.random(), u2=Math.random();
+    const z=Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
+    const noise = (i===5||i===14) ? (Math.random()>0.5?2.4:-2.4)*sd : (Math.random()>0.92?2.1*sd*(Math.random()>0.5?1:-1):0);
+    d.push(+(mean + z*sd*0.6 + noise).toFixed(3));
+  }
+  return d;
+}
+
+let chart;
+let currentData = genData(14.2, 0.35);
+
+function getWestgardViolations(data, mean, sd) {
+  const viols = [];
+  for (let i=0;i<data.length;i++) {
+    const z = (data[i]-mean)/sd;
+    const day = i+1;
+    if (Math.abs(z)>3) viols.push({day, rule:'13s', msg:`Hari ${day}: nilai ${data[i]} melewati ±3SD → Reject`, type:'error'});
+    else if (Math.abs(z)>2) {
+      if (i>0 && Math.sign(data[i]-mean)===Math.sign(data[i-1]-mean) && Math.abs((data[i-1]-mean)/sd)>2)
+        viols.push({day, rule:'22s', msg:`Hari ${day-1}-${day}: dua berturut ±2SD arah sama → Warning`, type:'warn'});
+      else
+        viols.push({day, rule:'22s?', msg:`Hari ${day}: nilai ${data[i]} melewati ±2SD → Warning`, type:'warn'});
+    }
+  }
+  // 10x rule check
+  if (data.length>=10) {
+    for (let i=9;i<data.length;i++) {
+      const seg = data.slice(i-9,i+1);
+      const allAbove = seg.every(v=>v>mean);
+      const allBelow = seg.every(v=>v<mean);
+      if (allAbove||allBelow) viols.push({day:i+1,rule:'10x',msg:`Hari ${i-8}-${i+1}: 10 titik berturut di sisi yang sama (10x rule)`,type:'warn'});
+    }
+  }
+  return viols;
+}
+
+function renderChart(mean, sd, data) {
+  const labels = data.map((_,i)=>`H${i+1}`);
+  const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridC = isDark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.06)';
+  const textC = isDark?'#aaa':'#888';
+
+  const viols = getWestgardViolations(data, mean, sd);
+  const pointColors = data.map((v,i)=>{
+    const z=(v-mean)/sd;
+    if(Math.abs(z)>3) return '#E24B4A';
+    if(viols.find(vl=>vl.day===i+1&&(vl.rule==='22s'||vl.rule==='22s?'))) return '#EF9F27';
+    return '#1D9E75';
+  });
+  const pointR = data.map((v,i)=>{
+    const z=(v-mean)/sd;
+    return Math.abs(z)>2?6:4;
+  });
+
+  const makeLine = (val,color,dash=[]) => ({
+    label:'_', data:Array(data.length).fill(val),
+    borderColor:color, borderWidth:1.5, borderDash:dash,
+    pointRadius:0, fill:false, tension:0
+  });
+
+  if(chart) chart.destroy();
+  chart = new Chart(document.getElementById('ljChart'),{
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        makeLine(mean+3*sd,'#E24B4A'),
+        makeLine(mean+2*sd,'#EF9F27',[6,4]),
+        makeLine(mean+sd,'#1D9E75',[3,3]),
+        makeLine(mean,'#378ADD'),
+        makeLine(mean-sd,'#1D9E75',[3,3]),
+        makeLine(mean-2*sd,'#EF9F27',[6,4]),
+        makeLine(mean-3*sd,'#E24B4A'),
+        {
+          label:'QC Value',
+          data,
+          borderColor:'#7F77DD',
+          borderWidth:1.5,
+          pointBackgroundColor:pointColors,
+          pointBorderColor:pointColors,
+          pointRadius:pointR,
+          pointHoverRadius:7,
+          tension:0.2,
+          fill:false,
+        }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label:(ctx)=>{
+              if(ctx.datasetIndex<7) return null;
+              const v=ctx.raw, z=((v-mean)/sd).toFixed(2);
+              return [`Nilai: ${v}`, `Z-score: ${z}SD`];
+            },
+            title:(items)=>`Hari ${items[0].dataIndex+1}`
+          }
+        }
+      },
+      scales:{
+        x:{grid:{color:gridC},ticks:{color:textC,font:{size:11}}},
+        y:{
+          grid:{color:gridC},
+          ticks:{color:textC,font:{size:11},callback:(v)=>v.toFixed(2)},
+          min:+(mean-3.5*sd).toFixed(2),
+          max:+(mean+3.5*sd).toFixed(2)
+        }
+      }
+    }
+  });
+
+  // update metrics
+  const cv = ((sd/mean)*100).toFixed(2);
+  document.getElementById('mMean').textContent = mean.toFixed(2);
+  document.getElementById('mSD').textContent = sd.toFixed(2);
+  document.getElementById('mCV').textContent = cv;
+  const hasError = viols.some(v=>v.type==='error');
+  const hasWarn = viols.some(v=>v.type==='warn');
+  const statusEl = document.getElementById('mStatus');
+  statusEl.textContent = hasError?'Out of Control':hasWarn?'Warning':'In Control';
+  statusEl.style.color = hasError?'var(--color-text-danger)':hasWarn?'var(--color-text-warning)':'var(--color-text-success)';
+  document.getElementById('mViolCount').textContent = `${viols.length} pelanggaran`;
+
+  // violations list
+  const box = document.getElementById('violBox');
+  if(viols.length===0){
+    box.innerHTML='<div class="violation-title">Westgard Rules</div><div class="no-viol">✓ Semua nilai dalam batas kontrol</div>';
+  } else {
+    const items = viols.map(v=>`<div class="viol-item ${v.type==='error'?'viol-error':'viol-warn'}"><strong>${v.rule}</strong> — ${v.msg}</div>`).join('');
+    box.innerHTML=`<div class="violation-title">Pelanggaran Westgard Rules</div><div class="viol-list">${items}</div>`;
+  }
+}
+
+function switchAnalyte() {
+  const key = document.getElementById('analyt').value;
+  const a = analytes[key];
+  document.getElementById('meanInput').value = a.mean;
+  document.getElementById('sdInput').value = a.sd;
+  currentData = genData(a.mean, a.sd);
+  recalc();
+}
+
+function recalc() {
+  const mean = parseFloat(document.getElementById('meanInput').value);
+  const sd = parseFloat(document.getElementById('sdInput').value);
+  if(isNaN(mean)||isNaN(sd)||sd<=0) return;
+  renderChart(mean, sd, currentData);
+}
+
+renderChart(14.2, 0.35, currentData);
+</script>

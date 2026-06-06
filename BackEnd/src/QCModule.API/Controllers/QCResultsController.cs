@@ -5,6 +5,7 @@ using QCModule.Application.Common.Authorization;
 using QCModule.Application.Common.Models;
 using QCModule.Application.Features.QCResults.Commands.AuthoriseQCResult;
 using QCModule.Application.Features.QCResults.Commands.CreateQCResult;
+using QCModule.Application.Features.QCResults.Commands.UpdateQCResult;
 using QCModule.Application.Features.QCResults.Commands.ValidateQCResult;
 using QCModule.Application.Features.QCResults.DTOs;
 using QCModule.Application.Features.QCResults.Queries.GetAuthorisationSummary;
@@ -42,6 +43,12 @@ public class QCResultsController(IMediator mediator) : ControllerBase
     public async Task<ActionResult<Result<QCResultDto>>> Create(
         [FromBody] CreateQCResultCommand cmd, CancellationToken ct)
         => Ok(await mediator.Send(cmd, ct));
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = Permissions.QCResults.Create)]
+    public async Task<ActionResult<Result<QCResultDto>>> Update(
+        Guid id, [FromBody] UpdateQCResultCommand cmd, CancellationToken ct)
+        => Ok(await mediator.Send(cmd with { Id = id }, ct));
 
     // ── Stage 1: Analyst validation ───────────────────────────────────────────
     [HttpPost("{id:guid}/validate")]

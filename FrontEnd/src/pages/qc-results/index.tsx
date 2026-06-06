@@ -153,6 +153,73 @@ function EntryModal({ onSave, onClose }: { onSave: (data: EntryForm) => Promise<
   );
 }
 
+// ── Edit modal ────────────────────────────────────────────────────────────────
+const editSchema = z.object({
+  resultDate: z.string().min(1, "Date required"),
+  value:      z.preprocess(v => Number(v), z.number({ invalid_type_error: "Enter a number" }).min(0)),
+  comment:    z.string().optional(),
+});
+type EditForm = z.infer<typeof editSchema>;
+
+function EditModal({ result, onSave, onClose }: {
+  result: QCResultSummaryDto;
+  onSave: (data: EditForm) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<EditForm>({
+    resolver: zodResolver(editSchema),
+    defaultValues: {
+      resultDate: dayjs(result.resultDate).format("YYYY-MM-DDTHH:mm"),
+      value:      result.value,
+      comment:    "",
+    },
+  });
+  const onSubmit = async (data: EditForm) => {
+    try {
+      await onSave({ ...data, resultDate: dayjs(data.resultDate).toISOString() });
+      toast.success("Result updated.");
+      onClose();
+    } catch (err) {
+      const msg = getErrorMessage(err);
+      setError("root", { message: msg });
+      toast.error(msg);
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="dark:bg-dark-800 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <h2 className="dark:text-dark-100 mb-4 text-lg font-semibold">Edit QC Result</h2>
+        <div className="dark:bg-dark-700 mb-4 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+          <p className="dark:text-dark-200 font-medium">{result.qcSampleName} — {result.parameterName}</p>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">Date & Time *</label>
+              <input {...register("resultDate")} type="datetime-local" className={inputCls} />
+              {errors.resultDate && <p className="mt-1 text-xs text-red-500">{errors.resultDate.message}</p>}
+            </div>
+            <div>
+              <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">Value *</label>
+              <input {...register("value")} type="number" step="any" className={inputCls} />
+              {errors.value && <p className="mt-1 text-xs text-red-500">{errors.value.message}</p>}
+            </div>
+          </div>
+          <div>
+            <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">Comment</label>
+            <input {...register("comment")} className={inputCls} placeholder="Optional comment" />
+          </div>
+          {errors.root && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">{errors.root.message}</div>}
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="dark:text-dark-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-dark-700">Cancel</button>
+            <button type="submit" disabled={isSubmitting} className="bg-primary-600 hover:bg-primary-700 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{isSubmitting ? "Saving…" : "Save"}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Analyst validation modal ──────────────────────────────────────────────────
 function ValidateModal({ result, onValidate, onClose }: {
   result: QCResultSummaryDto;
@@ -202,6 +269,7 @@ export default function QCResultsPage() {
   const [page,        setPage]        = useState(1);
   const [loading,     setLoading]     = useState(true);
   const [showEntry,   setShowEntry]   = useState(false);
+  const [editing,     setEditing]     = useState<QCResultSummaryDto | null>(null);
   const [validating,  setValidating]  = useState<QCResultSummaryDto | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -288,6 +356,11 @@ export default function QCResultsPage() {
     const res = await qcResultService.create(data);
     load();
     return res.data.message ?? "Result saved.";
+  };
+
+  const handleEdit = async (data: any) => {
+    await qcResultService.update(editing!.id, data);
+    load();
   };
 
   const handleValidate = async (reject: boolean, note?: string) => {
@@ -443,13 +516,23 @@ export default function QCResultsPage() {
                 <td className="px-4 py-3"><AuthBadge status={r.authorisationStatus} /></td>
                 {canValidate && (
                   <td className="px-4 py-3 text-right">
-                    {r.validationStatus === "Pending" ? (
-                      <button onClick={() => setValidating(r)} className="rounded-lg px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20">Validate</button>
-                    ) : r.authorisationStatus !== "Authorised" ? (
-                      <button onClick={() => handleCancelValidation(r)} className="rounded-lg px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-600">Cancel</button>
-                    ) : (
-                      <span className="text-xs text-gray-300 dark:text-dark-500">Locked</span>
-                    )}
+                    <div className="flex items-center justify-end gap-1">
+                      {r.validationStatus === "Pending" && (
+                        <>
+                          <button onClick={() => setEditing(r)}
+                            className="rounded-lg px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-600">Edit</button>
+                          <button onClick={() => setValidating(r)}
+                            className="rounded-lg px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20">Validate</button>
+                        </>
+                      )}
+                      {r.validationStatus !== "Pending" && r.authorisationStatus !== "Authorised" && (
+                        <button onClick={() => handleCancelValidation(r)}
+                          className="rounded-lg px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-600">Cancel</button>
+                      )}
+                      {r.authorisationStatus === "Authorised" && (
+                        <span className="text-xs text-gray-300 dark:text-dark-500">Locked</span>
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>
@@ -470,6 +553,7 @@ export default function QCResultsPage() {
       </div>
 
       {showEntry  && <EntryModal onSave={handleEntry} onClose={() => { setShowEntry(false); load(); }} />}
+      {editing    && <EditModal result={editing} onSave={handleEdit} onClose={() => setEditing(null)} />}
       {validating && <ValidateModal result={validating} onValidate={handleValidate} onClose={() => setValidating(null)} />}
     </div>
   );
