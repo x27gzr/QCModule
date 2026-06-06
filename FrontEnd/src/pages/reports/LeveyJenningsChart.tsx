@@ -1,10 +1,7 @@
 import { useState } from "react";
 import dayjs from "dayjs";
-import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import type { LeveyJenningsDto, LeveyJenningsPoint, QCStatus } from "@/services/qcResultService";
 import type { WestgardRules } from "@/services/qcSampleService";
-
-dayjs.extend(isSameOrBefore);
 
 // ── Chart layout constants ────────────────────────────────────────────────────
 const W   = 900;
@@ -91,7 +88,7 @@ function generateDateRange(from: string, to: string): string[] {
   const dates: string[] = [];
   let cur = dayjs(from);
   const end = dayjs(to);
-  while (cur.isSameOrBefore(end, "day")) {
+  while (!cur.isAfter(end, "day")) {
     dates.push(cur.format("YYYY-MM-DD"));
     cur = cur.add(1, "day");
   }
