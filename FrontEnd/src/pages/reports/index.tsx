@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChartBarIcon, DocumentChartBarIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
-import qcSampleService, { type QCSampleSummaryDto } from "@/services/qcSampleService";
+import qcSampleService, { type QCSampleSummaryDto, type WestgardRules } from "@/services/qcSampleService";
 import qcResultService, { type QCSampleTargetDto, type LeveyJenningsDto } from "@/services/qcResultService";
 import LeveyJenningsChart from "./LeveyJenningsChart";
 
@@ -24,20 +24,23 @@ export default function ReportsPage() {
   const [dateFrom,  setDateFrom]  = useState("");
   const [dateTo,    setDateTo]    = useState("");
 
-  const [chart,     setChart]     = useState<LeveyJenningsDto | null>(null);
-  const [loading,   setLoading]   = useState(false);
+  const [chart,      setChart]      = useState<LeveyJenningsDto | null>(null);
+  const [sampleRules, setSampleRules] = useState<WestgardRules | null>(null);
+  const [loading,    setLoading]    = useState(false);
 
   // Load QC samples once
   useEffect(() => {
     qcSampleService.getAll({ pageSize: 100 }).then(r => setSamples(r.data.data.items));
   }, []);
 
-  // When sample changes, load its targets (parameters that can be charted)
+  // When sample changes, load its targets + rules
   useEffect(() => {
     setParamId("");
     setChart(null);
+    setSampleRules(null);
     if (!sampleId) { setTargets([]); return; }
     qcResultService.getTargets(sampleId).then(r => setTargets(r.data.data));
+    qcSampleService.getById(sampleId).then(r => setSampleRules(r.data.data.westgardRules));
   }, [sampleId]);
 
   // Load chart when sample + parameter selected (or filters change)
@@ -145,7 +148,7 @@ export default function ReportsPage() {
                 <p className="dark:text-dark-400 text-sm text-gray-400">No QC results in the selected range.</p>
               </div>
             ) : (
-              <LeveyJenningsChart data={chart} />
+              <LeveyJenningsChart data={chart} westgardRules={sampleRules ?? undefined} />
             )}
           </div>
         </>

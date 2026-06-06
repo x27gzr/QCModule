@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
-import { PlusIcon, ArrowPathIcon, ChartBarIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, ClockIcon, ShieldCheckIcon, FunnelIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, ArrowPathIcon, ChartBarIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, ClockIcon, ShieldCheckIcon, FunnelIcon, EyeIcon, EyeSlashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import dayjs from "dayjs";
-import qcResultService, { type QCResultSummaryDto, type QCStatus, type ValidationStatus, type AuthorisationStatus } from "@/services/qcResultService";
-import qcSampleService, { type QCSampleSummaryDto } from "@/services/qcSampleService";
+import qcResultService, { type QCResultSummaryDto, type QCStatus, type ValidationStatus, type AuthorisationStatus, type LeveyJenningsDto } from "@/services/qcResultService";
+import qcSampleService, { type QCSampleSummaryDto, type WestgardRules } from "@/services/qcSampleService";
 import instrumentService, { type InstrumentSummaryDto } from "@/services/instrumentService";
 import testFileService, { type TestFileDto } from "@/services/testFileService";
 import { useAuth } from "@/contexts/auth/context";
 import { getErrorMessage } from "@/utils/apiError";
+import LeveyJenningsChart from "@/pages/reports/LeveyJenningsChart";
 
 // ── Westgard status ───────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<QCStatus, { label: string; icon: React.ElementType; color: string }> = {
@@ -374,6 +375,12 @@ export default function QCResultsPage() {
   const [validating,  setValidating]  = useState<QCResultSummaryDto | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
+  // LJ Chart modal
+  const [ljOpen,       setLjOpen]       = useState(false);
+  const [ljData,       setLjData]       = useState<LeveyJenningsDto | null>(null);
+  const [ljRules,      setLjRules]      = useState<WestgardRules | null>(null);
+  const [ljLoading,    setLjLoading]    = useState(false);
+
   // Filter state
   const [instruments,  setInstruments]  = useState<InstrumentSummaryDto[]>([]);
   const [allSamples,   setAllSamples]   = useState<QCSampleSummaryDto[]>([]);
@@ -433,6 +440,24 @@ export default function QCResultsPage() {
   };
 
   const hasActiveFilters = fInstrument || fSample || fParam || fDateFrom || fDateTo || fValStatus || fDeleted;
+
+  const openLjChart = async () => {
+    if (!fSample || !fParam) return;
+    setLjOpen(true);
+    setLjLoading(true);
+    setLjData(null);
+    setLjRules(null);
+    try {
+      const [ljRes, sampleRes] = await Promise.all([
+        qcResultService.getLeveyJennings({ qcSampleId: fSample, testFileParameterId: fParam,
+          dateFrom: fDateFrom ? dayjs(fDateFrom).toISOString() : undefined,
+          dateTo:   fDateTo   ? dayjs(fDateTo).endOf("day").toISOString() : undefined }),
+        qcSampleService.getById(fSample),
+      ]);
+      setLjData(ljRes.data.data);
+      setLjRules(sampleRes.data.data.westgardRules);
+    } finally { setLjLoading(false); }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -513,10 +538,10 @@ export default function QCResultsPage() {
         </div>
         <div className="flex gap-2">
           {fSample && fParam && (
-            <a href={`/reports?qcSampleId=${fSample}&testFileParameterId=${fParam}`}
+            <button onClick={openLjChart}
               className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
-              <ChartBarIcon className="size-4" />View Chart
-            </a>
+              <ChartBarIcon className="size-4" />LJ Chart
+            </button>
           )}
           <button onClick={load} className="dark:text-dark-300 dark:hover:bg-dark-700 rounded-lg p-2 text-gray-500 hover:bg-gray-100"><ArrowPathIcon className="size-4" /></button>
           <button onClick={() => setShowEntry(true)} className="bg-primary-600 hover:bg-primary-700 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"><PlusIcon className="size-4" />Enter Result</button>
@@ -691,6 +716,76 @@ export default function QCResultsPage() {
       {deleting   && <DeleteResultModal result={deleting} onConfirm={handleDelete} onClose={() => setDeleting(null)} />}
       {cancelling && <CancelValidationModal result={cancelling} onConfirm={handleCancelValidation} onClose={() => setCancelling(null)} />}
       {validating && <ValidateModal result={validating} onValidate={handleValidate} onClose={() => setValidating(null)} />}
+
+      {/* ── Levey-Jennings Chart Modal ───────────────────────────────────── */}
+      {ljOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8">
+          <div className="dark:bg-dark-800 w-full max-w-4xl rounded-2xl bg-white shadow-2xl">
+            {/* Header */}
+            <div className="dark:border-dark-600 flex items-start justify-between border-b border-gray-200 px-6 py-4">
+              <div>
+                {ljData ? (
+                  <>
+                    <h2 className="dark:text-dark-100 text-lg font-semibold text-gray-800">
+                      {ljData.parameterName}{ljData.unit ? ` (${ljData.unit})` : ""} — Levey-Jennings
+                    </h2>
+                    <p className="dark:text-dark-400 mt-0.5 text-sm text-gray-500">
+                      {ljData.qcSampleName} · {ljData.level}
+                      {ljData.hasTarget && ` · Mean ${ljData.mean.toFixed(2)} · SD ${ljData.sd.toFixed(2)} · CV ${ljData.cv.toFixed(2)}%`}
+                    </p>
+                  </>
+                ) : (
+                  <h2 className="dark:text-dark-100 text-lg font-semibold text-gray-800">Levey-Jennings Chart</h2>
+                )}
+              </div>
+              <button onClick={() => setLjOpen(false)}
+                className="dark:text-dark-400 ml-4 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-700">
+                <XMarkIcon className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {ljLoading ? (
+                <div className="flex h-64 items-center justify-center">
+                  <div className="border-primary-500 size-8 animate-spin rounded-full border-4 border-t-transparent" />
+                </div>
+              ) : !ljData ? null : !ljData.hasTarget ? (
+                <div className="flex h-48 flex-col items-center justify-center text-center">
+                  <ExclamationTriangleIcon className="mb-2 size-10 text-amber-400" />
+                  <p className="dark:text-dark-300 font-medium text-gray-700">No target set for this parameter</p>
+                  <p className="dark:text-dark-400 mt-1 text-sm text-gray-400">Set Mean / SD in QC Samples → Targets first.</p>
+                </div>
+              ) : ljData.points.length === 0 ? (
+                <div className="flex h-48 flex-col items-center justify-center text-center">
+                  <ChartBarIcon className="mb-2 size-10 text-gray-300 dark:text-dark-500" />
+                  <p className="dark:text-dark-400 text-sm text-gray-400">No QC results in the selected date range.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Stats row */}
+                  <div className="mb-5 grid grid-cols-3 gap-3 sm:grid-cols-6">
+                    {[
+                      { label: "Total",    value: ljData.totalCount,    color: "text-gray-800 dark:text-dark-100" },
+                      { label: "Accepted", value: ljData.acceptedCount, color: "text-emerald-600" },
+                      { label: "Warning",  value: ljData.warningCount,  color: "text-amber-500" },
+                      { label: "Rejected", value: ljData.rejectedCount, color: "text-red-600" },
+                      { label: "Mean",     value: ljData.mean.toFixed(2), color: "text-gray-800 dark:text-dark-100" },
+                      { label: "CV (%)",   value: ljData.cv.toFixed(2),   color: "text-gray-800 dark:text-dark-100" },
+                    ].map(s => (
+                      <div key={s.label} className="dark:bg-dark-700 rounded-xl bg-gray-50 px-3 py-2.5">
+                        <p className="dark:text-dark-400 text-xs text-gray-500">{s.label}</p>
+                        <p className={`mt-0.5 text-lg font-bold ${s.color}`}>{s.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <LeveyJenningsChart data={ljData} westgardRules={ljRules ?? undefined} />
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
