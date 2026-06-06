@@ -375,13 +375,28 @@ export default function QCResultsPage() {
   const [validating,  setValidating]  = useState<QCResultSummaryDto | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  // LJ Chart panel (driven by clicking row in table)
+  // LJ Chart panel
   const [ljSampleId,  setLjSampleId]   = useState("");
   const [ljParamId,   setLjParamId]    = useState("");
   const [ljData,      setLjData]       = useState<LeveyJenningsDto | null>(null);
   const [ljRules,     setLjRules]      = useState<WestgardRules | null>(null);
   const [ljSample,    setLjSample]     = useState<import("@/services/qcSampleService").QCSampleDto | null>(null);
   const [ljLoading,   setLjLoading]    = useState(false);
+  // Period selector
+  const [ljPeriod,    setLjPeriod]     = useState<"20days"|"month"|"custom">("20days");
+  const [ljCustFrom,  setLjCustFrom]   = useState("");
+  const [ljCustTo,    setLjCustTo]     = useState("");
+
+  const ljDateRange = (): { from: string; to: string } => {
+    if (ljPeriod === "month") {
+      return { from: dayjs().startOf("month").format("YYYY-MM-DD"), to: dayjs().endOf("month").format("YYYY-MM-DD") };
+    }
+    if (ljPeriod === "custom" && ljCustFrom && ljCustTo) {
+      return { from: ljCustFrom, to: ljCustTo };
+    }
+    // default: last 20 days
+    return { from: dayjs().subtract(19,"day").format("YYYY-MM-DD"), to: dayjs().format("YYYY-MM-DD") };
+  };
 
   // Filter state
   const [instruments,  setInstruments]  = useState<InstrumentSummaryDto[]>([]);
@@ -443,20 +458,37 @@ export default function QCResultsPage() {
 
   const hasActiveFilters = fInstrument || fSample || fParam || fDateFrom || fDateTo || fValStatus || fDeleted;
 
-  const loadChart = async (sampleId: string, paramId: string) => {
+  const loadChart = async (sampleId: string, paramId: string, from?: string, to?: string) => {
     setLjSampleId(sampleId);
     setLjParamId(paramId);
     setLjLoading(true);
     setLjData(null);
+    const range = from && to ? { from, to } : ljDateRange();
     try {
       const [ljRes, sampleRes] = await Promise.all([
-        qcResultService.getLeveyJennings({ qcSampleId: sampleId, testFileParameterId: paramId }),
+        qcResultService.getLeveyJennings({
+          qcSampleId: sampleId,
+          testFileParameterId: paramId,
+          dateFrom: dayjs(range.from).toISOString(),
+          dateTo:   dayjs(range.to).endOf("day").toISOString(),
+        }),
         qcSampleService.getById(sampleId),
       ]);
       setLjData(ljRes.data.data);
       setLjRules(sampleRes.data.data.westgardRules);
       setLjSample(sampleRes.data.data);
     } finally { setLjLoading(false); }
+  };
+
+  // Reload chart when period changes (if a param is already selected)
+  const changePeriod = (p: "20days"|"month"|"custom") => {
+    setLjPeriod(p);
+    if (ljSampleId && ljParamId && p !== "custom") {
+      const range = p === "month"
+        ? { from: dayjs().startOf("month").format("YYYY-MM-DD"), to: dayjs().endOf("month").format("YYYY-MM-DD") }
+        : { from: dayjs().subtract(19,"day").format("YYYY-MM-DD"), to: dayjs().format("YYYY-MM-DD") };
+      loadChart(ljSampleId, ljParamId, range.from, range.to);
+    }
   };
 
   const load = useCallback(async () => {
@@ -749,11 +781,35 @@ export default function QCResultsPage() {
           </div>
         ) : ljData && (
           <>
-            {/* Chart title bar */}
-            <div className="dark:border-dark-600 shrink-0 border-b border-gray-100 px-5 py-2 text-center">
+            {/* Chart title bar + period selector */}
+            <div className="dark:border-dark-600 flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-2">
               <span className="dark:text-dark-100 text-sm font-semibold text-gray-700">
                 {ljData.parameterName}{ljData.unit ? ` (${ljData.unit})` : ""} — {ljData.level}
               </span>
+              <div className="flex items-center gap-1.5">
+                {(["20days","month","custom"] as const).map(p => (
+                  <button key={p} onClick={() => changePeriod(p)}
+                    className={`rounded px-2 py-0.5 text-xs font-medium transition-colors
+                      ${ljPeriod===p
+                        ?"bg-primary-600 text-white"
+                        :"bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-600 dark:text-dark-300 dark:hover:bg-dark-500"}`}>
+                    {p==="20days"?"20 Hari":p==="month"?"Bulan Ini":"Custom"}
+                  </button>
+                ))}
+                {ljPeriod==="custom" && (
+                  <>
+                    <input type="date" value={ljCustFrom} onChange={e => setLjCustFrom(e.target.value)}
+                      className="dark:bg-dark-700 dark:text-dark-100 dark:border-dark-500 rounded border border-gray-200 px-1.5 py-0.5 text-xs" />
+                    <span className="text-xs text-gray-400">–</span>
+                    <input type="date" value={ljCustTo} onChange={e => setLjCustTo(e.target.value)}
+                      className="dark:bg-dark-700 dark:text-dark-100 dark:border-dark-500 rounded border border-gray-200 px-1.5 py-0.5 text-xs" />
+                    <button onClick={() => { if (ljCustFrom && ljCustTo) loadChart(ljSampleId, ljParamId, ljCustFrom, ljCustTo); }}
+                      className="rounded bg-primary-600 px-2 py-0.5 text-xs text-white hover:bg-primary-700">
+                      Apply
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Split: info kiri + chart kanan — fills remaining height */}
@@ -829,9 +885,10 @@ export default function QCResultsPage() {
                   <LeveyJenningsChart
                     data={ljData}
                     westgardRules={ljRules ?? undefined}
-                    maxPoints={20}
                     showViolations={false}
                     fillHeight={true}
+                    dateFrom={ljDateRange().from}
+                    dateTo={ljDateRange().to}
                   />
                 )}
               </div>
