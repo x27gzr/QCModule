@@ -21,6 +21,8 @@ public record QCResultDto(
 
 public record QCResultSummaryDto(
     Guid                Id,
+    Guid                QCSampleId,
+    Guid                TestFileParameterId,
     string              QCSampleName,
     string              Level,
     string              ParameterName,

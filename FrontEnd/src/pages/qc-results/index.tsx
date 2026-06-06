@@ -441,18 +441,17 @@ export default function QCResultsPage() {
 
   const hasActiveFilters = fInstrument || fSample || fParam || fDateFrom || fDateTo || fValStatus || fDeleted;
 
-  const openLjChart = async () => {
-    if (!fSample || !fParam) return;
+  const openLjChart = async (sampleId: string, paramId: string) => {
     setLjOpen(true);
     setLjLoading(true);
     setLjData(null);
     setLjRules(null);
     try {
       const [ljRes, sampleRes] = await Promise.all([
-        qcResultService.getLeveyJennings({ qcSampleId: fSample, testFileParameterId: fParam,
+        qcResultService.getLeveyJennings({ qcSampleId: sampleId, testFileParameterId: paramId,
           dateFrom: fDateFrom ? dayjs(fDateFrom).toISOString() : undefined,
           dateTo:   fDateTo   ? dayjs(fDateTo).endOf("day").toISOString() : undefined }),
-        qcSampleService.getById(fSample),
+        qcSampleService.getById(sampleId),
       ]);
       setLjData(ljRes.data.data);
       setLjRules(sampleRes.data.data.westgardRules);
@@ -538,7 +537,7 @@ export default function QCResultsPage() {
         </div>
         <div className="flex gap-2">
           {fSample && fParam && (
-            <button onClick={openLjChart}
+            <button onClick={() => openLjChart(fSample, fParam)}
               className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
               <ChartBarIcon className="size-4" />LJ Chart
             </button>
@@ -643,8 +642,18 @@ export default function QCResultsPage() {
             ) : results.map(r => (
               <tr key={r.id} className={`dark:hover:bg-dark-700/50 hover:bg-gray-50 transition-colors ${r.isDeleted ? "opacity-50 bg-red-50/40 dark:bg-red-900/10" : r.status === "Rejected" ? "bg-red-50/30 dark:bg-red-900/5" : r.status === "Warning" ? "bg-amber-50/30 dark:bg-amber-900/5" : ""}`}>
                 <td className="px-4 py-3">
-                  <p className="text-sm font-medium text-gray-800 dark:text-dark-100">{r.parameterName}{r.unit ? ` (${r.unit})` : ""}</p>
-                  <p className="text-xs text-gray-400 dark:text-dark-400">{r.qcSampleName} · {r.level}</p>
+                  <div className="flex items-start gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800 dark:text-dark-100">{r.parameterName}{r.unit ? ` (${r.unit})` : ""}</p>
+                      <p className="text-xs text-gray-400 dark:text-dark-400">{r.qcSampleName} · {r.level}</p>
+                    </div>
+                    <button
+                      title="View LJ Chart"
+                      onClick={() => openLjChart(r.qcSampleId, r.testFileParameterId)}
+                      className="ml-auto shrink-0 rounded p-1 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20">
+                      <ChartBarIcon className="size-3.5" />
+                    </button>
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <p className="text-xs text-gray-500 dark:text-dark-400">{dayjs(r.resultDate).format("DD MMM YYYY HH:mm")}</p>

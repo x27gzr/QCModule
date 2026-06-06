@@ -51,7 +51,8 @@ public class GetQCResultsQueryHandler(
                 sampleMap.TryGetValue(r.QCSampleId, out var s);
                 paramMap.TryGetValue(r.TestFileParameterId, out var p);
                 return new QCResultSummaryDto(
-                    r.Id, s?.Name ?? "?", s?.Level ?? "?",
+                    r.Id, r.QCSampleId, r.TestFileParameterId,
+                    s?.Name ?? "?", s?.Level ?? "?",
                     p?.ParameterName ?? "?", p?.Unit,
                     r.UserId.HasValue ? userMap.GetValueOrDefault(r.UserId.Value) : null,
                     r.ResultDate, r.Value, r.ZScore, r.Status, r.WestgardFlags,

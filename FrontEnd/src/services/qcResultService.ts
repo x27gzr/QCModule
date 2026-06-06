@@ -7,6 +7,8 @@ export type AuthorisationStatus = "Pending" | "Authorised" | "Rejected";
 
 export interface QCResultSummaryDto {
   id: string;
+  qcSampleId: string;
+  testFileParameterId: string;
   qcSampleName: string;
   level: string;
   parameterName: string;
@@ -38,9 +40,6 @@ export interface AuthorisationSummaryDto {
 }
 
 export interface QCResultDto extends QCResultSummaryDto {
-  qcSampleId: string;
-  testFileParameterId: string;
-  enteredByName: string;
   comment: string | null;
 }
 
