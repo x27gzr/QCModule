@@ -5,8 +5,8 @@ import type { WestgardRules } from "@/services/qcSampleService";
 
 // ── Z-score chart constants ───────────────────────────────────────────────────
 const W    = 900;
-const H    = 340;
-const PAD  = { top: 28, right: 16, bottom: 36, left: 44 };
+const H    = 260;
+const PAD  = { top: 20, right: 16, bottom: 30, left: 44 };
 const PW   = W - PAD.left - PAD.right;
 const PH   = H - PAD.top  - PAD.bottom;
 const Y_MIN = -4;

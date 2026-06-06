@@ -520,7 +520,12 @@ export default function QCResultsPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="space-y-4">
+    // -m-6 offsets main's p-6, h-[calc(100vh-4rem)] fills exactly topbar-subtracted viewport
+    <div className="-m-6 flex h-[calc(100vh-4rem)] flex-col overflow-hidden">
+
+      {/* ── Scrollable top (toolbar + filters + table) ────────────────── */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-6">
+      <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -725,8 +730,12 @@ export default function QCResultsPage() {
       {cancelling && <CancelValidationModal result={cancelling} onConfirm={handleCancelValidation} onClose={() => setCancelling(null)} />}
       {validating && <ValidateModal result={validating} onValidate={handleValidate} onClose={() => setValidating(null)} />}
 
-      {/* ── Levey-Jennings Panel (klik icon chart di baris atas) ───────── */}
-      <div className="dark:bg-dark-800 dark:border-dark-600 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs">
+      </div>{/* end scrollable inner */}
+      </div>{/* end scrollable outer */}
+
+      {/* ── LJ Panel — FIXED di bawah, tidak ikut scroll ─────────────── */}
+      <div className="dark:bg-dark-800 dark:border-dark-600 flex h-[270px] shrink-0 flex-col overflow-hidden border-t border-gray-200 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+      <div className="dark:bg-dark-800 dark:border-dark-600 overflow-hidden bg-white" style={{height:'100%'}}>
         {!ljParamId ? (
           /* Placeholder */
           <div className="flex h-32 flex-col items-center justify-center gap-2 text-center">
@@ -829,7 +838,8 @@ export default function QCResultsPage() {
             </div>
           </>
         )}
-      </div>
-    </div>
+      </div>{/* end inner card */}
+      </div>{/* end fixed panel */}
+    </div>{/* end page root */}
   );
 }
