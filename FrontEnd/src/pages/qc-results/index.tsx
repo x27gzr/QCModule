@@ -64,24 +64,35 @@ const entrySchema = z.object({
 });
 type EntryForm = z.infer<typeof entrySchema>;
 
-function EntryModal({ onSave, onClose }: { onSave: (data: EntryForm) => Promise<string>; onClose: () => void }) {
-  const [samples, setSamples]     = useState<QCSampleSummaryDto[]>([]);
-  const [testFiles, setTestFiles] = useState<TestFileDto[]>([]);
-  const [savedMsg, setSavedMsg]   = useState<string | null>(null);
+function EntryModal({ onSave, onClose, defaultSampleId }: {
+  onSave: (data: EntryForm) => Promise<string>;
+  onClose: () => void;
+  defaultSampleId?: string;
+}) {
+  const [samples,    setSamples]    = useState<QCSampleSummaryDto[]>([]);
+  const [params,     setParams]     = useState<{ id: string; label: string }[]>([]);
+  const [selectedSample, setSelectedSample] = useState(defaultSampleId ?? "");
+  const [savedMsg,   setSavedMsg]   = useState<string | null>(null);
 
-  const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<EntryForm>({
+  const { register, handleSubmit, setValue, setError, formState: { errors, isSubmitting } } = useForm<EntryForm>({
     resolver: zodResolver(entrySchema),
-    defaultValues: { resultDate: dayjs().format("YYYY-MM-DDTHH:mm") },
+    defaultValues: { resultDate: dayjs().format("YYYY-MM-DDTHH:mm"), qcSampleId: defaultSampleId ?? "" },
   });
 
   useEffect(() => {
-    qcSampleService.getAll({ pageSize: 100 }).then(r => setSamples(r.data.data.items));
-    testFileService.getAll({ isActive: true, pageSize: 100 }).then(r =>
-      Promise.all(r.data.data.items.map(tf => testFileService.getById(tf.id).then(x => x.data.data))).then(setTestFiles));
+    qcSampleService.getAll({ isActive: true, pageSize: 200 }).then(r => setSamples(r.data.data.items));
   }, []);
 
-  const availableParams = testFiles.flatMap(tf =>
-    tf.parameters.map(p => ({ id: p.id, label: `${p.parameterName}${p.unit ? ` (${p.unit})` : ""}`, testFile: tf.name })));
+  // Load parameters from targets when sample changes
+  useEffect(() => {
+    if (selectedSample) {
+      qcResultService.getTargets(selectedSample).then(r =>
+        setParams(r.data.data.map(t => ({ id: t.testFileParameterId, label: t.parameterName }))));
+    } else {
+      setParams([]);
+    }
+    setValue("testFileParameterId", "");
+  }, [selectedSample, setValue]);
 
   const onSubmit = async (data: EntryForm) => {
     try {
@@ -112,19 +123,21 @@ function EntryModal({ onSave, onClose }: { onSave: (data: EntryForm) => Promise<
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">QC Sample *</label>
-            <select {...register("qcSampleId")} className={inputCls}>
+            <select {...register("qcSampleId")} className={inputCls}
+              onChange={e => { setValue("qcSampleId", e.target.value); setSelectedSample(e.target.value); }}>
               <option value="">Select QC sample…</option>
               {samples.map(s => <option key={s.id} value={s.id}>{s.name} — {s.level} (Lot: {s.lotNumber})</option>)}
             </select>
             {errors.qcSampleId && <p className="mt-1 text-xs text-red-500">{errors.qcSampleId.message}</p>}
           </div>
           <div>
-            <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">Parameter / Analyte *</label>
-            <select {...register("testFileParameterId")} className={inputCls}>
-              <option value="">Select parameter…</option>
-              {availableParams.map(p => <option key={p.id} value={p.id}>{p.label} [{p.testFile}]</option>)}
+            <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">Parameter *</label>
+            <select {...register("testFileParameterId")} className={inputCls} disabled={!selectedSample}>
+              <option value="">{selectedSample ? "Select parameter…" : "Select QC sample first"}</option>
+              {params.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
             {errors.testFileParameterId && <p className="mt-1 text-xs text-red-500">{errors.testFileParameterId.message}</p>}
+            {selectedSample && params.length === 0 && <p className="mt-1 text-xs text-amber-500">No targets set for this sample. Set targets first.</p>}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -254,6 +267,45 @@ function EditModal({ result, onSave, onClose }: {
             <button type="submit" disabled={isSubmitting} className="bg-primary-600 hover:bg-primary-700 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{isSubmitting ? "Saving…" : "Save"}</button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Cancel validation modal ───────────────────────────────────────────────────
+function CancelValidationModal({ result, onConfirm, onClose }: {
+  result: QCResultSummaryDto;
+  onConfirm: (reason: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const handle = async () => {
+    if (!reason.trim()) { toast.error("Reason is required."); return; }
+    setLoading(true);
+    try { await onConfirm(reason); }
+    catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setLoading(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="dark:bg-dark-800 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <h2 className="dark:text-dark-100 mb-2 text-lg font-semibold">Cancel Validation</h2>
+        <div className="dark:bg-dark-700 mb-4 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+          <p className="dark:text-dark-200 font-medium">{result.qcSampleName} — {result.parameterName}</p>
+          <p className="dark:text-dark-400 text-gray-500">Value: {result.value}</p>
+        </div>
+        <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">Reason *</label>
+        <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3}
+          className="dark:bg-dark-900 dark:text-dark-100 dark:border-dark-600 mb-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+          placeholder="Enter reason for cancellation…" />
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="dark:text-dark-300 rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-dark-700">Cancel</button>
+          <button onClick={handle} disabled={loading || !reason.trim()}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60">
+            {loading ? "Cancelling…" : "Confirm"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -421,16 +473,14 @@ export default function QCResultsPage() {
     load();
   };
 
-  const handleCancelValidation = async (r: QCResultSummaryDto) => {
-    const reason = window.prompt("Reason for cancelling validation:");
-    if (!reason) return;
+  const [cancelling, setCancelling] = useState<QCResultSummaryDto | null>(null);
+  const handleCancelValidation = async (reason: string) => {
     try {
-      await qcResultService.cancelValidation(r.id, reason);
+      await qcResultService.cancelValidation(cancelling!.id, reason);
       toast.success("Validation cancelled.");
+      setCancelling(null);
       load();
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    }
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
   const totalPages = Math.ceil(total / pageSize);
@@ -453,6 +503,12 @@ export default function QCResultsPage() {
           )}
         </div>
         <div className="flex gap-2">
+          {fSample && fParam && (
+            <a href={`/reports?qcSampleId=${fSample}&testFileParameterId=${fParam}`}
+              className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">
+              <ChartBarIcon className="size-4" />View Chart
+            </a>
+          )}
           <button onClick={load} className="dark:text-dark-300 dark:hover:bg-dark-700 rounded-lg p-2 text-gray-500 hover:bg-gray-100"><ArrowPathIcon className="size-4" /></button>
           <button onClick={() => setShowEntry(true)} className="bg-primary-600 hover:bg-primary-700 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"><PlusIcon className="size-4" />Enter Result</button>
         </div>
@@ -584,7 +640,7 @@ export default function QCResultsPage() {
                             </>
                           )}
                           {r.validationStatus !== "Pending" && r.authorisationStatus !== "Authorised" && (
-                            <button onClick={() => handleCancelValidation(r)}
+                            <button onClick={() => setCancelling(r)}
                               className="rounded-lg px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-dark-300 dark:hover:bg-dark-600">Cancel</button>
                           )}
                           {r.authorisationStatus === "Authorised" ? (
@@ -615,9 +671,10 @@ export default function QCResultsPage() {
         )}
       </div>
 
-      {showEntry  && <EntryModal onSave={handleEntry} onClose={() => { setShowEntry(false); load(); }} />}
+      {showEntry  && <EntryModal onSave={handleEntry} defaultSampleId={fSample || undefined} onClose={() => { setShowEntry(false); load(); }} />}
       {editing    && <EditModal result={editing} onSave={handleEdit} onClose={() => setEditing(null)} />}
       {deleting   && <DeleteResultModal result={deleting} onConfirm={handleDelete} onClose={() => setDeleting(null)} />}
+      {cancelling && <CancelValidationModal result={cancelling} onConfirm={handleCancelValidation} onClose={() => setCancelling(null)} />}
       {validating && <ValidateModal result={validating} onValidate={handleValidate} onClose={() => setValidating(null)} />}
     </div>
   );
