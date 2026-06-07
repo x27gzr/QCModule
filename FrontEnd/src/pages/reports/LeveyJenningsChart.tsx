@@ -229,32 +229,32 @@ export default function LeveyJenningsChart({
               fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.75" />
           ))}
 
-          {/* Data points */}
+          {/* Data points + value labels */}
           {slots.map((slot, i) => {
             if (!slot) return null;
-            const ptIdx = slotToPt[i]!;
+            const ptIdx  = slotToPt[i]!;
             const color  = resolveDotColor(ptIdx, violations, slot.status);
             const isHov  = hover === i;
             const hasViol = violations.some(v => v.pointIndices.includes(ptIdx));
+            const cx     = xOf(i);
+            const cy     = yOf(slot.value);
             return (
               <g key={`pt-${i}`}
                 onMouseEnter={() => setHover(i)}
                 onMouseLeave={() => setHover(null)}
                 style={{ cursor: "pointer" }}>
-                <circle cx={xOf(i)} cy={yOf(slot.value)} r="10" fill="transparent" />
+                <circle cx={cx} cy={cy} r="10" fill="transparent" />
                 {hasViol && (
-                  <circle cx={xOf(i)} cy={yOf(slot.value)} r={isHov?8:7}
+                  <circle cx={cx} cy={cy} r={isHov?8:7}
                     fill="none" stroke={color} strokeWidth="1" opacity="0.35" />
                 )}
-                <circle cx={xOf(i)} cy={yOf(slot.value)} r={isHov?5.5:4}
+                <circle cx={cx} cy={cy} r={isHov?5.5:4}
                   fill={color} stroke="#fff" strokeWidth="1.5" />
-                {/* Value label on hover */}
-                {isHov && (
-                  <text x={xOf(i)} y={yOf(slot.value)-9} textAnchor="middle"
-                    fontSize="9" fontWeight="600" fill={color}>
-                    {slot.value}
-                  </text>
-                )}
+                {/* Value label — always visible above point */}
+                <text x={cx} y={cy - 7} textAnchor="middle"
+                  fontSize="7.5" fontWeight="600" fill={color} opacity="0.9">
+                  {slot.value}
+                </text>
               </g>
             );
           })}
@@ -275,31 +275,49 @@ export default function LeveyJenningsChart({
 
           {/* Tooltip */}
           {hover !== null && hoverSlot && (() => {
-            const z     = sd > 0 ? ((hoverSlot.value - mean) / sd) : 0;
-            const cx    = xOf(hover);
-            const cy    = yOf(hoverSlot.value);
-            const tx    = Math.min(Math.max(cx - 72, PAD.left), PAD.left + PW - 148);
-            const ty    = Math.max(cy - 72, PAD.top + 2);
-            const pvs   = hoverPtIdx !== null ? violations.filter(v => v.pointIndices.includes(hoverPtIdx)) : [];
-            const bH    = 60 + pvs.length * 13;
-            const color = resolveDotColor(hoverPtIdx!, violations, hoverSlot.status);
+            const z      = sd > 0 ? ((hoverSlot.value - mean) / sd) : 0;
+            const cx     = xOf(hover);
+            const cy     = yOf(hoverSlot.value);
+            const tx     = Math.min(Math.max(cx - 80, PAD.left), PAD.left + PW - 170);
+            const ty     = Math.max(cy - 80, PAD.top + 2);
+            const pvs    = hoverPtIdx !== null ? violations.filter(v => v.pointIndices.includes(hoverPtIdx)) : [];
+            const color  = resolveDotColor(hoverPtIdx!, violations, hoverSlot.status);
+            const isVal  = hoverSlot.validationStatus === "Validated";
+            const valColor = isVal ? "#34d399" : hoverSlot.validationStatus === "Rejected" ? "#f87171" : "#94a3b8";
+            const rows   = 5 + (hoverSlot.validatedByName ? 1 : 0) + pvs.length;
+            const bH     = rows * 14 + 10;
             return (
               <g pointerEvents="none">
-                <rect x={tx} y={ty} width={148} height={bH} rx="5" fill="#0f172a" opacity="0.94" />
-                <text x={tx+7} y={ty+14} fontSize="10" fill="#f1f5f9" fontWeight="600">
-                  {dayjs(hoverSlot.resultDate).format("DD MMM YYYY")}
+                <rect x={tx} y={ty} width={168} height={bH} rx="5" fill="#0f172a" opacity="0.95" />
+                {/* Date */}
+                <text x={tx+8} y={ty+14} fontSize="10" fill="#f1f5f9" fontWeight="600">
+                  {dayjs(hoverSlot.resultDate).format("DD MMM YYYY HH:mm")}
                 </text>
-                <text x={tx+7} y={ty+27} fontSize="10" fill="#94a3b8">
-                  Nilai: {hoverSlot.value}
+                {/* Value */}
+                <text x={tx+8} y={ty+27} fontSize="10" fill="#94a3b8">
+                  Nilai: <tspan fill={color} fontWeight="700">{hoverSlot.value}</tspan>
                 </text>
-                <text x={tx+7} y={ty+40} fontSize="10" fill="#94a3b8">
+                {/* Z-score */}
+                <text x={tx+8} y={ty+40} fontSize="10" fill="#94a3b8">
                   Z-score: {z>=0?"+":""}{z.toFixed(2)}
                 </text>
-                <text x={tx+7} y={ty+53} fontSize="10" fill={color} fontWeight="500">
-                  {hoverSlot.status}{hoverSlot.westgardFlags?` (${hoverSlot.westgardFlags})`:""}
+                {/* Westgard status */}
+                <text x={tx+8} y={ty+53} fontSize="10" fill={color} fontWeight="500">
+                  {hoverSlot.status}{hoverSlot.westgardFlags?` · ${hoverSlot.westgardFlags}`:""}
                 </text>
+                {/* Validation status */}
+                <text x={tx+8} y={ty+66} fontSize="10" fill={valColor}>
+                  {hoverSlot.validationStatus === "Validated" ? "✓" : hoverSlot.validationStatus === "Rejected" ? "✗" : "⏳"} {hoverSlot.validationStatus}
+                </text>
+                {/* Analyst name */}
+                {hoverSlot.validatedByName && (
+                  <text x={tx+8} y={ty+79} fontSize="10" fill="#60a5fa">
+                    Analis: {hoverSlot.validatedByName}
+                  </text>
+                )}
+                {/* Violations */}
                 {pvs.map((viol, k) => (
-                  <text key={k} x={tx+7} y={ty+66+k*13} fontSize="9"
+                  <text key={k} x={tx+8} y={ty+79+(hoverSlot.validatedByName?13:0)+k*13} fontSize="9"
                     fill={viol.type==="rejection"?"#fca5a5":"#fcd34d"}>
                     ▲ {viol.rule}
                   </text>

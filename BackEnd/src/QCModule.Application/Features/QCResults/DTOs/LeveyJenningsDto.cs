@@ -3,12 +3,15 @@ using QCModule.Domain.Enums;
 namespace QCModule.Application.Features.QCResults.DTOs;
 
 public record LeveyJenningsPointDto(
-    Guid     ResultId,
-    DateTime ResultDate,
-    double   Value,
-    double   ZScore,
-    QCStatus Status,
-    string?  WestgardFlags
+    Guid              ResultId,
+    DateTime          ResultDate,
+    double            Value,
+    double            ZScore,
+    QCStatus          Status,
+    string?           WestgardFlags,
+    ValidationStatus  ValidationStatus,
+    string?           ValidatedByName,
+    DateTime?         ValidatedAt
 );
 
 public record LeveyJenningsDto(

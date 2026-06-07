@@ -12,7 +12,8 @@ public class GetLeveyJenningsQueryHandler(
     IRepository<QCResult>          resultRepo,
     IRepository<QCSample>          sampleRepo,
     IRepository<TestFileParameter> paramRepo,
-    IRepository<QCSampleTarget>    targetRepo)
+    IRepository<QCSampleTarget>    targetRepo,
+    IRepository<User>              userRepo)
     : IRequestHandler<GetLeveyJenningsQuery, Result<LeveyJenningsDto>>
 {
     public async Task<Result<LeveyJenningsDto>> Handle(GetLeveyJenningsQuery request, CancellationToken cancellationToken)
@@ -44,6 +45,17 @@ public class GetLeveyJenningsQueryHandler(
 
         var ordered = filtered.OrderBy(r => r.ResultDate).ToList();
 
+        // Load analyst names for validated results
+        var validatedByIds = ordered
+            .Where(r => r.ValidatedBy.HasValue)
+            .Select(r => r.ValidatedBy!.Value)
+            .Distinct()
+            .ToList();
+        var analysts = validatedByIds.Count > 0
+            ? await userRepo.FindAsync(u => validatedByIds.Contains(u.Id), cancellationToken)
+            : [];
+        var analystMap = analysts.ToDictionary(u => u.Id, u => u.Name);
+
         // Calculated stats from last 20 displayed points
         var display     = ordered.TakeLast(20).ToList();
         var displayN    = display.Count;
@@ -54,7 +66,10 @@ public class GetLeveyJenningsQueryHandler(
         var calcCV      = calcMean > 0 ? calcSD / calcMean * 100 : 0;
 
         var points = ordered.Select(r => new LeveyJenningsPointDto(
-            r.Id, r.ResultDate, r.Value, r.ZScore, r.Status, r.WestgardFlags));
+            r.Id, r.ResultDate, r.Value, r.ZScore, r.Status, r.WestgardFlags,
+            r.ValidationStatus,
+            r.ValidatedBy.HasValue ? analystMap.GetValueOrDefault(r.ValidatedBy.Value) : null,
+            r.ValidatedAt));
 
         var dto = new LeveyJenningsDto(
             QCSampleId:          sample.Id,

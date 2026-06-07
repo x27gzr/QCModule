@@ -63,6 +63,9 @@ export interface LeveyJenningsPoint {
   zScore: number;
   status: QCStatus;
   westgardFlags: string | null;
+  validationStatus: ValidationStatus;
+  validatedByName: string | null;
+  validatedAt: string | null;
 }
 
 export interface LeveyJenningsDto {
