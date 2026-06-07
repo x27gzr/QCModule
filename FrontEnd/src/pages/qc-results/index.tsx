@@ -887,8 +887,6 @@ export default function QCResultsPage() {
                     westgardRules={ljRules ?? undefined}
                     showViolations={false}
                     fillHeight={true}
-                    dateFrom={ljDateRange().from}
-                    dateTo={ljDateRange().to}
                   />
                 )}
               </div>

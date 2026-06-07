@@ -66,6 +66,7 @@ export interface LeveyJenningsPoint {
   validationStatus: ValidationStatus;
   validatedByName: string | null;
   validatedAt: string | null;
+  comment: string | null;
 }
 
 export interface LeveyJenningsDto {

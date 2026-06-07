@@ -11,7 +11,8 @@ public record LeveyJenningsPointDto(
     string?           WestgardFlags,
     ValidationStatus  ValidationStatus,
     string?           ValidatedByName,
-    DateTime?         ValidatedAt
+    DateTime?         ValidatedAt,
+    string?           Comment
 );
 
 public record LeveyJenningsDto(

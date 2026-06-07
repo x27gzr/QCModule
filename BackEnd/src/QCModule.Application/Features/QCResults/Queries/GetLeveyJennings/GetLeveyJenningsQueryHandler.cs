@@ -69,7 +69,8 @@ public class GetLeveyJenningsQueryHandler(
             r.Id, r.ResultDate, r.Value, r.ZScore, r.Status, r.WestgardFlags,
             r.ValidationStatus,
             r.ValidatedBy.HasValue ? analystMap.GetValueOrDefault(r.ValidatedBy.Value) : null,
-            r.ValidatedAt));
+            r.ValidatedAt,
+            r.Comment));
 
         var dto = new LeveyJenningsDto(
             QCSampleId:          sample.Id,

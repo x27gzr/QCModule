@@ -6,13 +6,13 @@ import type { WestgardRules } from "@/services/qcSampleService";
 // ── Chart layout constants ────────────────────────────────────────────────────
 const W   = 900;
 const H   = 260;
-const PAD = { top: 24, right: 60, bottom: 32, left: 60 };
+const PAD = { top: 24, right: 56, bottom: 34, left: 56 };
 const PW  = W - PAD.left - PAD.right;
 const PH  = H - PAD.top  - PAD.bottom;
 
-// ── Westgard violation engine ─────────────────────────────────────────────────
+// ── Westgard violation engine (operates on in-trend points only) ──────────────
 interface Violation {
-  pointIndices: number[];   // indices into the filtered pts array (non-null slots)
+  pointIndices: number[];   // indices into the `active` array
   rule: string;
   type: "warning" | "rejection";
   msg: string;
@@ -47,29 +47,29 @@ function computeViolations(
     }
     if (i>=2 && rules.rule3_1s) {
       const s=zs.slice(i-2,i+1);
-      if (s.every(v=>v>1)||s.every(v=>v<-1))
+      if (s.every(x=>x>1)||s.every(x=>x<-1))
         v.push({pointIndices:[i-2,i-1,i],rule:"3:1s",type:"warning",msg:`Titik ${i-1}-${i+1}: 3 berturut >±1SD`});
     }
     if (i>=3 && rules.rule4_1s) {
       const s=zs.slice(i-3,i+1);
-      if (s.every(v=>v>1)||s.every(v=>v<-1))
+      if (s.every(x=>x>1)||s.every(x=>x<-1))
         v.push({pointIndices:[i-3,i-2,i-1,i],rule:"4:1s",type:"rejection",msg:`Titik ${i-2}-${i+1}: 4 berturut >±1SD`});
     }
     if (i>=8 && rules.rule9x) {
       const s=zs.slice(i-8,i+1);
-      if (s.every(v=>v>0)||s.every(v=>v<0))
+      if (s.every(x=>x>0)||s.every(x=>x<0))
         v.push({pointIndices:Array.from({length:9},(_,k)=>i-8+k),rule:"9x",type:"rejection",msg:`Titik ${i-7}-${i+1}: 9 berturut sisi sama`});
     }
     if (i>=9 && rules.rule10x) {
       const s=zs.slice(i-9,i+1);
-      if (s.every(v=>v>0)||s.every(v=>v<0))
+      if (s.every(x=>x>0)||s.every(x=>x<0))
         v.push({pointIndices:Array.from({length:10},(_,k)=>i-9+k),rule:"10x",type:"rejection",msg:`Titik ${i-8}-${i+1}: 10 berturut sisi sama`});
     }
   }
   return v;
 }
 
-// ── Dot colour ────────────────────────────────────────────────────────────────
+// ── Colours ───────────────────────────────────────────────────────────────────
 const STATUS_COLOR: Record<QCStatus, string> = {
   Accepted: "#2563eb",
   Warning:  "#f59e0b",
@@ -77,22 +77,18 @@ const STATUS_COLOR: Record<QCStatus, string> = {
   Pending:  "#9ca3af",
 };
 
-function resolveDotColor(ptIdx: number, viols: Violation[], status: QCStatus): string {
-  if (viols.some(v => v.pointIndices.includes(ptIdx) && v.type==="rejection")) return "#ef4444";
-  if (viols.some(v => v.pointIndices.includes(ptIdx) && v.type==="warning"))   return "#f59e0b";
-  return STATUS_COLOR[status];
-}
+// A point is "excluded" (out of range, re-controlled) when the analyst rejected it.
+const isExcluded = (p: LeveyJenningsPoint) => p.validationStatus === "Rejected";
 
-// ── Date-range helpers ────────────────────────────────────────────────────────
-function generateDateRange(from: string, to: string): string[] {
-  const dates: string[] = [];
-  let cur = dayjs(from);
-  const end = dayjs(to);
-  while (!cur.isAfter(end, "day")) {
-    dates.push(cur.format("YYYY-MM-DD"));
-    cur = cur.add(1, "day");
+// Strip the "Analyst: " prefix the backend prepends to rejection notes.
+function rejectionReason(p: LeveyJenningsPoint): string {
+  const parts: string[] = [];
+  if (p.westgardFlags) parts.push(p.westgardFlags);
+  if (p.comment) {
+    const note = p.comment.replace(/^Analyst:\s*/i, "").split("\n")[0].trim();
+    if (note) parts.push(note);
   }
-  return dates;
+  return parts.length ? parts.join(" · ") : "Out of range";
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -101,53 +97,42 @@ interface Props {
   westgardRules?: WestgardRules;
   showViolations?: boolean;
   fillHeight?: boolean;
-  dateFrom?: string;
-  dateTo?: string;
 }
 
-// ── Main chart ────────────────────────────────────────────────────────────────
 export default function LeveyJenningsChart({
   data, westgardRules, showViolations = true, fillHeight = false,
-  dateFrom, dateTo,
 }: Props) {
-  const [hover, setHover] = useState<number | null>(null); // index into allDates
+  const [hover, setHover] = useState<number | null>(null); // original point index
 
-  const { mean, sd, points } = data;
+  const { mean, sd } = data;
+  const pts = data.points;       // chronological, already filtered by date range
+  const n   = pts.length;
 
-  // Build date slots
-  const from = dateFrom ?? (points.length ? dayjs(points[0].resultDate).format("YYYY-MM-DD") : dayjs().subtract(20,"day").format("YYYY-MM-DD"));
-  const to   = dateTo   ?? (points.length ? dayjs(points[points.length-1].resultDate).format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"));
-  const allDates = generateDateRange(from, to);
-  const n = allDates.length;
+  // In-trend points (exclude analyst-rejected) keep their original index.
+  const active = pts.map((p, i) => ({ p, i })).filter(({ p }) => !isExcluded(p));
 
-  // One result per day (take first if multiple same day)
-  const dateMap = new Map<string, LeveyJenningsPoint>();
-  points.forEach(p => {
-    const d = dayjs(p.resultDate).format("YYYY-MM-DD");
-    if (!dateMap.has(d)) dateMap.set(d, p);
-  });
-  const slots: (LeveyJenningsPoint | null)[] = allDates.map(d => dateMap.get(d) ?? null);
+  // Westgard evaluation runs on in-trend points only.
+  const violations = westgardRules ? computeViolations(active.map(a => a.p), mean, sd, westgardRules) : [];
 
-  // Filtered non-null pts for violation engine (preserving order)
-  const filledPts = slots.filter((s): s is LeveyJenningsPoint => s !== null);
-  // Map slot index → filledPts index
-  const slotToPt: (number | null)[] = (() => {
-    let idx = 0;
-    return slots.map(s => s ? idx++ : null);
-  })();
+  // Map original index → violation severity (for colouring trend points).
+  const sevByOrig = new Map<number, "warning" | "rejection">();
+  violations.forEach(v => v.pointIndices.forEach(ai => {
+    const oi = active[ai].i;
+    if (v.type === "rejection" || sevByOrig.get(oi) !== "rejection") sevByOrig.set(oi, v.type);
+  }));
 
-  const violations = westgardRules ? computeViolations(filledPts, mean, sd, westgardRules) : [];
-
-  // Y-axis: actual values ±3.5SD
-  const yPad  = sd > 0 ? 3.5 * sd : 1;
-  const yMin  = mean - yPad;
-  const yMax  = mean + yPad;
-  const ySpan = yMax - yMin;
+  // ── Y domain: actual values, ±3.5SD expanded to include any outliers ────────
+  const vals    = pts.map(p => p.value);
+  const dataMin = vals.length ? Math.min(...vals) : mean - sd;
+  const dataMax = vals.length ? Math.max(...vals) : mean + sd;
+  const yMin    = Math.min(mean - 3.5 * sd, dataMin - 0.3 * sd);
+  const yMax    = Math.max(mean + 3.5 * sd, dataMax + 0.3 * sd);
+  const ySpan   = (yMax - yMin) || 1;
 
   const yOf = (v: number) => PAD.top + ((yMax - v) / ySpan) * PH;
-  const xOf = (i: number) => n <= 1 ? PAD.left + PW/2 : PAD.left + (i / (n-1)) * PW;
+  const xOf = (i: number) => n <= 1 ? PAD.left + PW / 2 : PAD.left + (i / (n - 1)) * PW;
 
-  // SD horizontal lines
+  // SD reference lines
   const sdLines = [
     { mult: 3,  color:"#ef4444", dash:"4 3", label:"+3SD" },
     { mult: 2,  color:"#f59e0b", dash:"4 3", label:"+2SD" },
@@ -158,64 +143,47 @@ export default function LeveyJenningsChart({
     { mult:-3,  color:"#ef4444", dash:"4 3", label:"-3SD" },
   ];
 
-  // Build polyline segments (break at null slots)
-  const polylineSegments: string[] = (() => {
-    const segs: string[] = [];
-    let cur: string[] = [];
-    slots.forEach((s, i) => {
-      if (s !== null) {
-        cur.push(`${xOf(i).toFixed(1)},${yOf(s.value).toFixed(1)}`);
-      } else {
-        if (cur.length > 1) segs.push(cur.join(" "));
-        else if (cur.length === 1) cur = []; // single isolated point, no line needed
-        cur = [];
-      }
-    });
-    if (cur.length > 1) segs.push(cur.join(" "));
-    return segs;
-  })();
+  // Trend line connects in-trend points, spanning ACROSS excluded ones.
+  const trendPoints = active.map(a => `${xOf(a.i).toFixed(1)},${yOf(a.p.value).toFixed(1)}`).join(" ");
 
-  // X-axis label step (max ~12 labels)
-  const labelEvery = Math.max(1, Math.ceil(n / 12));
+  // Dot colour for an in-trend point
+  const trendColor = (oi: number, status: QCStatus) => {
+    const sev = sevByOrig.get(oi);
+    if (sev === "rejection") return "#ef4444";
+    if (sev === "warning")   return "#f59e0b";
+    return STATUS_COLOR[status];
+  };
 
-  // Tooltip state
-  const hoverSlot = hover !== null ? slots[hover] : null;
-  const hoverPtIdx = hover !== null ? slotToPt[hover] : null;
+  const labelEvery = Math.max(1, Math.ceil(n / 14));
 
-  const svgStyle = fillHeight
-    ? { width: "100%", height: "100%", display: "block" }
-    : { minWidth: 480 };
+  const svgStyle = fillHeight ? { width: "100%", height: "100%", display: "block" } : { minWidth: 480 };
   const svgClass = fillHeight ? "" : "w-full";
   const svgPAR   = fillHeight ? "none" : "xMidYMid meet";
+
+  const hovered = hover !== null ? pts[hover] : null;
 
   return (
     <div className={fillHeight ? "h-full w-full" : "w-full space-y-3"}>
       <div className={fillHeight ? "h-full overflow-hidden" : "overflow-x-auto"}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={svgStyle} className={svgClass}
-          preserveAspectRatio={svgPAR}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={svgStyle} className={svgClass} preserveAspectRatio={svgPAR}>
 
-          {/* Vertical day grid */}
-          {allDates.map((_, i) => (
-            <line key={`vg-${i}`}
-              x1={xOf(i)} y1={PAD.top} x2={xOf(i)} y2={PAD.top+PH}
+          {/* Vertical grid per point */}
+          {pts.map((_, i) => (
+            <line key={`vg-${i}`} x1={xOf(i)} y1={PAD.top} x2={xOf(i)} y2={PAD.top+PH}
               stroke="#e2e8f0" strokeWidth="0.6" />
           ))}
 
-          {/* SD horizontal lines + left labels */}
+          {/* SD lines + labels */}
           {sd > 0 && sdLines.map(l => {
-            const y     = yOf(mean + l.mult * sd);
-            const isMn  = l.mult === 0;
-            const val   = (mean + l.mult * sd).toFixed(2);
+            const y    = yOf(mean + l.mult * sd);
+            const isMn = l.mult === 0;
             return (
               <g key={l.label}>
                 <line x1={PAD.left} y1={y} x2={PAD.left+PW} y2={y}
-                  stroke={l.color} strokeWidth={isMn ? 1.5 : 0.9}
-                  strokeDasharray={l.dash} />
-                {/* Left: value */}
+                  stroke={l.color} strokeWidth={isMn?1.5:0.9} strokeDasharray={l.dash} />
                 <text x={PAD.left-6} y={y+3.5} textAnchor="end" fontSize="9" fill={l.color}>
-                  {val}
+                  {(mean + l.mult*sd).toFixed(2)}
                 </text>
-                {/* Right: SD label */}
                 <text x={PAD.left+PW+4} y={y+3.5} textAnchor="start" fontSize="9" fill={l.color} fontWeight={isMn?"600":"400"}>
                   {l.label}
                 </text>
@@ -223,105 +191,108 @@ export default function LeveyJenningsChart({
             );
           })}
 
-          {/* Polyline segments (gaps = null days) */}
-          {polylineSegments.map((pts_, i) => (
-            <polyline key={`seg-${i}`} points={pts_}
-              fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.75" />
-          ))}
+          {/* Trend line (in-trend points only) */}
+          {active.length > 1 && (
+            <polyline points={trendPoints} fill="none" stroke="#3b82f6" strokeWidth="1.5" opacity="0.75" />
+          )}
 
-          {/* Data points + value labels */}
-          {slots.map((slot, i) => {
-            if (!slot) return null;
-            const ptIdx  = slotToPt[i]!;
-            const color  = resolveDotColor(ptIdx, violations, slot.status);
-            const isHov  = hover === i;
-            const hasViol = violations.some(v => v.pointIndices.includes(ptIdx));
-            const cx     = xOf(i);
-            const cy     = yOf(slot.value);
+          {/* Points */}
+          {pts.map((p, i) => {
+            const cx = xOf(i);
+            const cy = yOf(p.value);
+            const isHov = hover === i;
+            const excluded = isExcluded(p);
+
+            if (excluded) {
+              // Floating excluded marker — red hollow circle with ×
+              const r = isHov ? 6.5 : 5.5;
+              return (
+                <g key={`pt-${i}`} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} style={{ cursor:"pointer" }}>
+                  <circle cx={cx} cy={cy} r="11" fill="transparent" />
+                  <circle cx={cx} cy={cy} r={r} fill="#fff" stroke="#ef4444" strokeWidth="1.6" />
+                  <line x1={cx-2.6} y1={cy-2.6} x2={cx+2.6} y2={cy+2.6} stroke="#ef4444" strokeWidth="1.3" />
+                  <line x1={cx-2.6} y1={cy+2.6} x2={cx+2.6} y2={cy-2.6} stroke="#ef4444" strokeWidth="1.3" />
+                  <text x={cx} y={cy-9} textAnchor="middle" fontSize="7.5" fontWeight="600" fill="#ef4444" opacity="0.85">
+                    {p.value}
+                  </text>
+                </g>
+              );
+            }
+
+            const color   = trendColor(i, p.status);
+            const hasViol = sevByOrig.has(i);
             return (
-              <g key={`pt-${i}`}
-                onMouseEnter={() => setHover(i)}
-                onMouseLeave={() => setHover(null)}
-                style={{ cursor: "pointer" }}>
-                <circle cx={cx} cy={cy} r="10" fill="transparent" />
-                {hasViol && (
-                  <circle cx={cx} cy={cy} r={isHov?8:7}
-                    fill="none" stroke={color} strokeWidth="1" opacity="0.35" />
-                )}
-                <circle cx={cx} cy={cy} r={isHov?5.5:4}
-                  fill={color} stroke="#fff" strokeWidth="1.5" />
-                {/* Value label — always visible above point */}
-                <text x={cx} y={cy - 7} textAnchor="middle"
-                  fontSize="7.5" fontWeight="600" fill={color} opacity="0.9">
-                  {slot.value}
+              <g key={`pt-${i}`} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} style={{ cursor:"pointer" }}>
+                <circle cx={cx} cy={cy} r="11" fill="transparent" />
+                {hasViol && <circle cx={cx} cy={cy} r={isHov?8:7} fill="none" stroke={color} strokeWidth="1" opacity="0.35" />}
+                <circle cx={cx} cy={cy} r={isHov?5.5:4} fill={color} stroke="#fff" strokeWidth="1.5" />
+                <text x={cx} y={cy-7} textAnchor="middle" fontSize="7.5" fontWeight="600" fill={color} opacity="0.9">
+                  {p.value}
                 </text>
               </g>
             );
           })}
 
           {/* X-axis date labels */}
-          {allDates.map((d, i) => {
+          {pts.map((p, i) => {
             if (i % labelEvery !== 0 && i !== n-1) return null;
-            const hasData = slots[i] !== null;
             return (
-              <text key={`xl-${i}`} x={xOf(i)} y={H-PAD.bottom+14}
-                textAnchor="middle" fontSize="8.5"
-                fill={hasData ? "#374151" : "#d1d5db"}
-                className="dark:fill-dark-300 dark:fill-dark-600">
-                {dayjs(d).format("DD/MM")}
+              <text key={`xl-${i}`} x={xOf(i)} y={H-PAD.bottom+14} textAnchor="middle" fontSize="8.5"
+                fill={isExcluded(p) ? "#ef4444" : "#94a3b8"}>
+                {dayjs(p.resultDate).format("DD/MM")}
               </text>
             );
           })}
 
           {/* Tooltip */}
-          {hover !== null && hoverSlot && (() => {
-            const z      = sd > 0 ? ((hoverSlot.value - mean) / sd) : 0;
+          {hover !== null && hovered && (() => {
+            const z      = sd > 0 ? ((hovered.value - mean) / sd) : 0;
             const cx     = xOf(hover);
-            const cy     = yOf(hoverSlot.value);
-            const tx     = Math.min(Math.max(cx - 80, PAD.left), PAD.left + PW - 170);
-            const ty     = Math.max(cy - 80, PAD.top + 2);
-            const pvs    = hoverPtIdx !== null ? violations.filter(v => v.pointIndices.includes(hoverPtIdx)) : [];
-            const color  = resolveDotColor(hoverPtIdx!, violations, hoverSlot.status);
-            const isVal  = hoverSlot.validationStatus === "Validated";
-            const valColor = isVal ? "#34d399" : hoverSlot.validationStatus === "Rejected" ? "#f87171" : "#94a3b8";
-            const rows   = 5 + (hoverSlot.validatedByName ? 1 : 0) + pvs.length;
-            const bH     = rows * 14 + 10;
+            const cy     = yOf(hovered.value);
+            const tx     = Math.min(Math.max(cx - 84, PAD.left), PAD.left + PW - 176);
+            const excluded = isExcluded(hovered);
+            const pvs    = excluded ? [] : violations.filter(v => v.pointIndices.some(ai => active[ai].i === hover));
+            const lines  = excluded ? 4 : (4 + (hovered.validatedByName ? 1 : 0) + pvs.length);
+            const bH     = lines * 14 + 12;
+            const ty     = Math.max(cy - bH - 10, PAD.top + 2);
+            const color  = excluded ? "#f87171" : trendColor(hover, hovered.status);
             return (
               <g pointerEvents="none">
-                <rect x={tx} y={ty} width={168} height={bH} rx="5" fill="#0f172a" opacity="0.95" />
-                {/* Date */}
-                <text x={tx+8} y={ty+14} fontSize="10" fill="#f1f5f9" fontWeight="600">
-                  {dayjs(hoverSlot.resultDate).format("DD MMM YYYY HH:mm")}
+                <rect x={tx} y={ty} width={176} height={bH} rx="5" fill="#0f172a" opacity="0.95" />
+                <text x={tx+8} y={ty+15} fontSize="10" fill="#f1f5f9" fontWeight="600">
+                  {dayjs(hovered.resultDate).format("DD MMM YYYY HH:mm")}
                 </text>
-                {/* Value */}
-                <text x={tx+8} y={ty+27} fontSize="10" fill="#94a3b8">
-                  Nilai: <tspan fill={color} fontWeight="700">{hoverSlot.value}</tspan>
+                <text x={tx+8} y={ty+29} fontSize="10" fill="#94a3b8">
+                  Nilai: <tspan fill={color} fontWeight="700">{hovered.value}</tspan>  ·  Z: {z>=0?"+":""}{z.toFixed(2)}
                 </text>
-                {/* Z-score */}
-                <text x={tx+8} y={ty+40} fontSize="10" fill="#94a3b8">
-                  Z-score: {z>=0?"+":""}{z.toFixed(2)}
-                </text>
-                {/* Westgard status */}
-                <text x={tx+8} y={ty+53} fontSize="10" fill={color} fontWeight="500">
-                  {hoverSlot.status}{hoverSlot.westgardFlags?` · ${hoverSlot.westgardFlags}`:""}
-                </text>
-                {/* Validation status */}
-                <text x={tx+8} y={ty+66} fontSize="10" fill={valColor}>
-                  {hoverSlot.validationStatus === "Validated" ? "✓" : hoverSlot.validationStatus === "Rejected" ? "✗" : "⏳"} {hoverSlot.validationStatus}
-                </text>
-                {/* Analyst name */}
-                {hoverSlot.validatedByName && (
-                  <text x={tx+8} y={ty+79} fontSize="10" fill="#60a5fa">
-                    Analis: {hoverSlot.validatedByName}
-                  </text>
+                {excluded ? (
+                  <>
+                    <text x={tx+8} y={ty+43} fontSize="10" fill="#f87171" fontWeight="600">
+                      ✗ Rejected — Out of Range
+                    </text>
+                    <text x={tx+8} y={ty+57} fontSize="9.5" fill="#fca5a5">
+                      Alasan: {rejectionReason(hovered)}
+                    </text>
+                  </>
+                ) : (
+                  <>
+                    <text x={tx+8} y={ty+43} fontSize="10" fill={color} fontWeight="500">
+                      {hovered.status}{hovered.westgardFlags?` · ${hovered.westgardFlags}`:""}
+                    </text>
+                    <text x={tx+8} y={ty+57} fontSize="10" fill={hovered.validationStatus==="Validated"?"#34d399":"#94a3b8"}>
+                      {hovered.validationStatus==="Validated"?"✓":"⏳"} {hovered.validationStatus}
+                    </text>
+                    {hovered.validatedByName && (
+                      <text x={tx+8} y={ty+71} fontSize="10" fill="#60a5fa">
+                        Analis: {hovered.validatedByName}
+                      </text>
+                    )}
+                    {pvs.map((v, k) => (
+                      <text key={k} x={tx+8} y={ty+71+(hovered.validatedByName?14:0)+k*13} fontSize="9"
+                        fill={v.type==="rejection"?"#fca5a5":"#fcd34d"}>▲ {v.rule}</text>
+                    ))}
+                  </>
                 )}
-                {/* Violations */}
-                {pvs.map((viol, k) => (
-                  <text key={k} x={tx+8} y={ty+79+(hoverSlot.validatedByName?13:0)+k*13} fontSize="9"
-                    fill={viol.type==="rejection"?"#fca5a5":"#fcd34d"}>
-                    ▲ {viol.rule}
-                  </text>
-                ))}
               </g>
             );
           })()}
@@ -330,9 +301,7 @@ export default function LeveyJenningsChart({
 
       {/* Violations panel — Reports page only */}
       {showViolations && westgardRules && (
-        <div className="space-y-2">
-          {violationsPanel(violations, westgardRules)}
-        </div>
+        <div className="space-y-2">{violationsPanel(violations, westgardRules)}</div>
       )}
     </div>
   );
