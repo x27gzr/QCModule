@@ -386,6 +386,8 @@ export default function QCResultsPage() {
   const [ljPeriod,    setLjPeriod]     = useState<"20days"|"month"|"custom">("20days");
   const [ljCustFrom,  setLjCustFrom]   = useState("");
   const [ljCustTo,    setLjCustTo]     = useState("");
+  const [ljFrom,      setLjFrom]       = useState("");   // actual fetched range (drives chart columns)
+  const [ljTo,        setLjTo]         = useState("");
 
   const ljDateRange = (): { from: string; to: string } => {
     if (ljPeriod === "month") {
@@ -464,6 +466,8 @@ export default function QCResultsPage() {
     setLjLoading(true);
     setLjData(null);
     const range = from && to ? { from, to } : ljDateRange();
+    setLjFrom(range.from);
+    setLjTo(range.to);
     try {
       const [ljRes, sampleRes] = await Promise.all([
         qcResultService.getLeveyJennings({
@@ -887,6 +891,8 @@ export default function QCResultsPage() {
                     westgardRules={ljRules ?? undefined}
                     showViolations={false}
                     fillHeight={true}
+                    rangeFrom={ljFrom || undefined}
+                    rangeTo={ljTo || undefined}
                   />
                 )}
               </div>

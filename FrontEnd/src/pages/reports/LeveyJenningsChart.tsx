@@ -97,10 +97,21 @@ interface Props {
   westgardRules?: WestgardRules;
   showViolations?: boolean;
   fillHeight?: boolean;
+  rangeFrom?: string;   // YYYY-MM-DD — draw full period width (e.g. whole month)
+  rangeTo?: string;
+}
+
+// Every calendar day in [from, to] inclusive.
+function calendarDays(from: string, to: string): string[] {
+  const days: string[] = [];
+  let cur = dayjs(from);
+  const end = dayjs(to);
+  while (!cur.isAfter(end, "day")) { days.push(cur.format("YYYY-MM-DD")); cur = cur.add(1, "day"); }
+  return days;
 }
 
 export default function LeveyJenningsChart({
-  data, westgardRules, showViolations = true, fillHeight = false,
+  data, westgardRules, showViolations = true, fillHeight = false, rangeFrom, rangeTo,
 }: Props) {
   const [hover, setHover] = useState<number | null>(null); // original point index
 
@@ -131,12 +142,16 @@ export default function LeveyJenningsChart({
   const yOf = (v: number) => PAD.top + ((yMax - v) / ySpan) * PH;
 
   // ── X-axis by calendar DAY: same-day results share one column ───────────────
+  // With a period range → draw every day of the period (full month width etc.);
+  // otherwise fall back to only days that have data.
   const dayKeyOf   = (p: LeveyJenningsPoint) => dayjs(p.resultDate).format("YYYY-MM-DD");
-  const uniqueDays = Array.from(new Set(pts.map(dayKeyOf)));   // pts chronological → days ascending
+  const uniqueDays = (rangeFrom && rangeTo)
+    ? calendarDays(rangeFrom, rangeTo)
+    : Array.from(new Set(pts.map(dayKeyOf)));
   const D          = uniqueDays.length;
   const dayCol     = new Map(uniqueDays.map((d, c) => [d, c]));
   const xOfCol     = (c: number) => D <= 1 ? PAD.left + PW / 2 : PAD.left + (c / (D - 1)) * PW;
-  const xOf        = (i: number) => xOfCol(dayCol.get(dayKeyOf(pts[i]))!);
+  const xOf        = (i: number) => xOfCol(dayCol.get(dayKeyOf(pts[i])) ?? 0);
 
   // SD reference lines
   const sdLines = [
