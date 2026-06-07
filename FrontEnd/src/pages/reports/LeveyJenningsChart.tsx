@@ -210,14 +210,14 @@ export default function LeveyJenningsChart({
             const excluded = isExcluded(p);
 
             if (excluded) {
-              // Floating excluded marker — red hollow circle with ×
+              // Floating excluded marker — red filled circle with white ×
               const r = isHov ? 6.5 : 5.5;
               return (
                 <g key={`pt-${i}`} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} style={{ cursor:"pointer" }}>
                   <circle cx={cx} cy={cy} r="11" fill="transparent" />
-                  <circle cx={cx} cy={cy} r={r} fill="#fff" stroke="#ef4444" strokeWidth="1.6" />
-                  <line x1={cx-2.6} y1={cy-2.6} x2={cx+2.6} y2={cy+2.6} stroke="#ef4444" strokeWidth="1.3" />
-                  <line x1={cx-2.6} y1={cy+2.6} x2={cx+2.6} y2={cy-2.6} stroke="#ef4444" strokeWidth="1.3" />
+                  <circle cx={cx} cy={cy} r={r} fill="#ef4444" stroke="#fff" strokeWidth="1.5" />
+                  <line x1={cx-2.6} y1={cy-2.6} x2={cx+2.6} y2={cy+2.6} stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+                  <line x1={cx-2.6} y1={cy+2.6} x2={cx+2.6} y2={cy-2.6} stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
                   <text x={cx} y={cy-9} textAnchor="middle" fontSize="7.5" fontWeight="600" fill="#ef4444" opacity="0.85">
                     {p.value}
                   </text>
