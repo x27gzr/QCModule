@@ -99,6 +99,8 @@ interface Props {
   fillHeight?: boolean;
   rangeFrom?: string;   // YYYY-MM-DD — draw full period width (e.g. whole month)
   rangeTo?: string;
+  /** Doctor mode: show an authorisation checkbox strip under each day column. */
+  onAuthorise?: (resultId: string) => void;
 }
 
 // Every calendar day in [from, to] inclusive.
@@ -111,7 +113,7 @@ function calendarDays(from: string, to: string): string[] {
 }
 
 export default function LeveyJenningsChart({
-  data, westgardRules, showViolations = true, fillHeight = false, rangeFrom, rangeTo,
+  data, westgardRules, showViolations = true, fillHeight = false, rangeFrom, rangeTo, onAuthorise,
 }: Props) {
   const [hover, setHover] = useState<number | null>(null); // original point index
 
@@ -177,6 +179,18 @@ export default function LeveyJenningsChart({
 
   const labelEvery = Math.max(1, Math.ceil(D / 14));
 
+  // ── Doctor authorisation strip: one representative result per day ───────────
+  const STRIP = onAuthorise ? 30 : 0;
+  const VBH   = H + STRIP;
+  // For each day, pick the in-trend (non-excluded) result to authorise.
+  const dayRep = new Map<string, LeveyJenningsPoint>();
+  if (onAuthorise) {
+    pts.forEach(p => {
+      if (isExcluded(p)) return;
+      dayRep.set(dayKeyOf(p), p); // keep latest of the day (pts chronological)
+    });
+  }
+
   const svgStyle = fillHeight ? { width: "100%", height: "100%", display: "block" } : { minWidth: 480 };
   const svgClass = fillHeight ? "" : "w-full";
   const svgPAR   = fillHeight ? "none" : "xMidYMid meet";
@@ -186,7 +200,7 @@ export default function LeveyJenningsChart({
   return (
     <div className={fillHeight ? "h-full w-full" : "w-full space-y-3"}>
       <div className={fillHeight ? "h-full overflow-hidden" : "overflow-x-auto"}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={svgStyle} className={svgClass} preserveAspectRatio={svgPAR}>
+        <svg viewBox={`0 0 ${W} ${VBH}`} style={svgStyle} className={svgClass} preserveAspectRatio={svgPAR}>
 
           {/* Vertical grid — one column per day */}
           {uniqueDays.map((d, c) => (
@@ -263,6 +277,40 @@ export default function LeveyJenningsChart({
                 fill={dayHasExcluded ? "#ef4444" : "#94a3b8"}>
                 {dayjs(d).format("DD/MM")}
               </text>
+            );
+          })}
+
+          {/* Doctor authorisation checkbox strip */}
+          {onAuthorise && uniqueDays.map((d, c) => {
+            const rep = dayRep.get(d);
+            const cx  = xOfCol(c);
+            const cy  = H + 14;
+            const s   = 13;                          // checkbox side
+            const x0  = cx - s/2, y0 = cy - s/2;
+
+            // States
+            const authorised = rep?.authorisationStatus === "Authorised";
+            const canAuth    = rep && rep.validationStatus === "Validated" && !authorised;
+
+            const fill   = authorised ? "#d1fae5" : canAuth ? "#fff" : "#f3f4f6";
+            const stroke = authorised ? "#10b981" : canAuth ? "#3b82f6" : "#d1d5db";
+            const title  = !rep ? `${dayjs(d).format("DD/MM")}: tidak ada data / belum tervalidasi`
+                         : authorised ? `${dayjs(d).format("DD/MM")}: Authorised oleh ${rep.authorisedByName ?? "-"}`
+                         : canAuth ? `${dayjs(d).format("DD/MM")}: klik untuk authorise (validasi: ${rep.validatedByName ?? "-"})`
+                         : `${dayjs(d).format("DD/MM")}: menunggu validasi analis`;
+
+            return (
+              <g key={`auth-${d}`}
+                style={{ cursor: canAuth ? "pointer" : "default" }}
+                onClick={() => { if (canAuth && rep) onAuthorise(rep.resultId); }}>
+                <title>{title}</title>
+                <rect x={x0} y={y0} width={s} height={s} rx="2.5"
+                  fill={fill} stroke={stroke} strokeWidth="1.5" opacity={rep ? 1 : 0.5} />
+                {authorised && (
+                  <path d={`M ${x0+3} ${cy} L ${x0+5.5} ${cy+3} L ${x0+s-3} ${y0+3.5}`}
+                    fill="none" stroke="#059669" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                )}
+              </g>
             );
           })}
 

@@ -45,16 +45,15 @@ public class GetLeveyJenningsQueryHandler(
 
         var ordered = filtered.OrderBy(r => r.ResultDate).ToList();
 
-        // Load analyst names for validated results
-        var validatedByIds = ordered
-            .Where(r => r.ValidatedBy.HasValue)
-            .Select(r => r.ValidatedBy!.Value)
+        // Load names for analyst (validated) + doctor (authorised)
+        var userIds = ordered.Where(r => r.ValidatedBy.HasValue).Select(r => r.ValidatedBy!.Value)
+            .Concat(ordered.Where(r => r.AuthorisedBy.HasValue).Select(r => r.AuthorisedBy!.Value))
             .Distinct()
             .ToList();
-        var analysts = validatedByIds.Count > 0
-            ? await userRepo.FindAsync(u => validatedByIds.Contains(u.Id), cancellationToken)
+        var usersList = userIds.Count > 0
+            ? await userRepo.FindAsync(u => userIds.Contains(u.Id), cancellationToken)
             : [];
-        var analystMap = analysts.ToDictionary(u => u.Id, u => u.Name);
+        var analystMap = usersList.ToDictionary(u => u.Id, u => u.Name);
 
         // Calculated stats from last 20 displayed points
         var display     = ordered.TakeLast(20).ToList();
@@ -70,7 +69,10 @@ public class GetLeveyJenningsQueryHandler(
             r.ValidationStatus,
             r.ValidatedBy.HasValue ? analystMap.GetValueOrDefault(r.ValidatedBy.Value) : null,
             r.ValidatedAt,
-            r.Comment));
+            r.Comment,
+            r.AuthorisationStatus,
+            r.AuthorisedBy.HasValue ? analystMap.GetValueOrDefault(r.AuthorisedBy.Value) : null,
+            r.AuthorisedAt));
 
         var dto = new LeveyJenningsDto(
             QCSampleId:          sample.Id,

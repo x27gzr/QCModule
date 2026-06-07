@@ -67,6 +67,9 @@ export interface LeveyJenningsPoint {
   validatedByName: string | null;
   validatedAt: string | null;
   comment: string | null;
+  authorisationStatus: AuthorisationStatus;
+  authorisedByName: string | null;
+  authorisedAt: string | null;
 }
 
 export interface LeveyJenningsDto {
