@@ -106,7 +106,6 @@ export default function LeveyJenningsChart({
 
   const { mean, sd } = data;
   const pts = data.points;       // chronological, already filtered by date range
-  const n   = pts.length;
 
   // In-trend points (exclude analyst-rejected) keep their original index.
   const active = pts.map((p, i) => ({ p, i })).filter(({ p }) => !isExcluded(p));
@@ -130,7 +129,14 @@ export default function LeveyJenningsChart({
   const ySpan   = (yMax - yMin) || 1;
 
   const yOf = (v: number) => PAD.top + ((yMax - v) / ySpan) * PH;
-  const xOf = (i: number) => n <= 1 ? PAD.left + PW / 2 : PAD.left + (i / (n - 1)) * PW;
+
+  // ── X-axis by calendar DAY: same-day results share one column ───────────────
+  const dayKeyOf   = (p: LeveyJenningsPoint) => dayjs(p.resultDate).format("YYYY-MM-DD");
+  const uniqueDays = Array.from(new Set(pts.map(dayKeyOf)));   // pts chronological → days ascending
+  const D          = uniqueDays.length;
+  const dayCol     = new Map(uniqueDays.map((d, c) => [d, c]));
+  const xOfCol     = (c: number) => D <= 1 ? PAD.left + PW / 2 : PAD.left + (c / (D - 1)) * PW;
+  const xOf        = (i: number) => xOfCol(dayCol.get(dayKeyOf(pts[i]))!);
 
   // SD reference lines
   const sdLines = [
@@ -154,7 +160,7 @@ export default function LeveyJenningsChart({
     return STATUS_COLOR[status];
   };
 
-  const labelEvery = Math.max(1, Math.ceil(n / 14));
+  const labelEvery = Math.max(1, Math.ceil(D / 14));
 
   const svgStyle = fillHeight ? { width: "100%", height: "100%", display: "block" } : { minWidth: 480 };
   const svgClass = fillHeight ? "" : "w-full";
@@ -167,9 +173,9 @@ export default function LeveyJenningsChart({
       <div className={fillHeight ? "h-full overflow-hidden" : "overflow-x-auto"}>
         <svg viewBox={`0 0 ${W} ${H}`} style={svgStyle} className={svgClass} preserveAspectRatio={svgPAR}>
 
-          {/* Vertical grid per point */}
-          {pts.map((_, i) => (
-            <line key={`vg-${i}`} x1={xOf(i)} y1={PAD.top} x2={xOf(i)} y2={PAD.top+PH}
+          {/* Vertical grid — one column per day */}
+          {uniqueDays.map((d, c) => (
+            <line key={`vg-${d}`} x1={xOfCol(c)} y1={PAD.top} x2={xOfCol(c)} y2={PAD.top+PH}
               stroke="#e2e8f0" strokeWidth="0.6" />
           ))}
 
@@ -233,13 +239,14 @@ export default function LeveyJenningsChart({
             );
           })}
 
-          {/* X-axis date labels */}
-          {pts.map((p, i) => {
-            if (i % labelEvery !== 0 && i !== n-1) return null;
+          {/* X-axis date labels — one per day column */}
+          {uniqueDays.map((d, c) => {
+            if (c % labelEvery !== 0 && c !== D-1) return null;
+            const dayHasExcluded = pts.some(p => dayKeyOf(p) === d && isExcluded(p));
             return (
-              <text key={`xl-${i}`} x={xOf(i)} y={H-PAD.bottom+14} textAnchor="middle" fontSize="8.5"
-                fill={isExcluded(p) ? "#ef4444" : "#94a3b8"}>
-                {dayjs(p.resultDate).format("DD/MM")}
+              <text key={`xl-${d}`} x={xOfCol(c)} y={H-PAD.bottom+14} textAnchor="middle" fontSize="8.5"
+                fill={dayHasExcluded ? "#ef4444" : "#94a3b8"}>
+                {dayjs(d).format("DD/MM")}
               </text>
             );
           })}
