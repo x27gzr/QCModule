@@ -76,6 +76,13 @@ public class QCResultsController(IMediator mediator) : ControllerBase
         Guid id, [FromBody] ReasonRequest body, CancellationToken ct)
         => Ok(await mediator.Send(new CancelValidationCommand(id, body.Reason), ct));
 
+    [HttpPost("batch-validate")]
+    [Authorize(Policy = Permissions.QCResults.Validate)]
+    public async Task<ActionResult<Result<BatchValidateResult>>> BatchValidate(
+        [FromBody] BatchValidateRequest body, CancellationToken ct)
+        => Ok(await mediator.Send(
+            new BatchValidateCommand(body.ResultIds, body.QcSampleId, body.TestFileParameterId), ct));
+
     // ── Stage 2: Doctor authorisation ─────────────────────────────────────────
     [HttpPost("{id:guid}/doctor-authorise")]
     [Authorize(Policy = Permissions.QCResults.Authorise)]
@@ -135,3 +142,4 @@ public record ValidateRequest(bool Reject, string? Note);
 public record NoteRequest(string? Note);
 public record ReasonRequest(string Reason);
 public record BatchAuthoriseRequest(IReadOnlyList<Guid> ResultIds, string? Note);
+public record BatchValidateRequest(IReadOnlyList<Guid>? ResultIds, Guid? QcSampleId, Guid? TestFileParameterId);

@@ -543,6 +543,26 @@ export default function QCResultsPage() {
     load();
   };
 
+  const [validatingAll,      setValidatingAll]      = useState(false);
+  const [confirmValidateAll, setConfirmValidateAll] = useState(false);
+  const handleValidateAll = async () => {
+    setValidatingAll(true);
+    try {
+      const res = await qcResultService.batchValidate({
+        qcSampleId:          fSample || undefined,
+        testFileParameterId: fParam  || undefined,
+      });
+      toast.success(res.data.message ?? "Batch validation selesai.");
+      setConfirmValidateAll(false);
+      load();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally { setValidatingAll(false); }
+  };
+
+  // Show "Validate All" only when there are pending results the analyst can act on.
+  const hasPending = results.some(r => !r.isDeleted && r.validationStatus === "Pending");
+
   const [cancelling, setCancelling] = useState<QCResultSummaryDto | null>(null);
   const handleCancelValidation = async (reason: string) => {
     try {
@@ -578,7 +598,12 @@ export default function QCResultsPage() {
           )}
         </div>
         <div className="flex gap-2">
-          {/* no toolbar LJ button needed — use per-row icon */}
+          {canValidate && hasPending && (
+            <button onClick={() => setConfirmValidateAll(true)} disabled={validatingAll}
+              className="flex items-center gap-2 rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-60 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+              <CheckCircleIcon className="size-4" />{validatingAll ? "Memvalidasi…" : "Validate All"}
+            </button>
+          )}
           <button onClick={load} className="dark:text-dark-300 dark:hover:bg-dark-700 rounded-lg p-2 text-gray-500 hover:bg-gray-100"><ArrowPathIcon className="size-4" /></button>
           <button onClick={() => setShowEntry(true)} className="bg-primary-600 hover:bg-primary-700 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"><PlusIcon className="size-4" />Enter Result</button>
         </div>
@@ -765,6 +790,37 @@ export default function QCResultsPage() {
       {deleting   && <DeleteResultModal result={deleting} onConfirm={handleDelete} onClose={() => setDeleting(null)} />}
       {cancelling && <CancelValidationModal result={cancelling} onConfirm={handleCancelValidation} onClose={() => setCancelling(null)} />}
       {validating && <ValidateModal result={validating} onValidate={handleValidate} onClose={() => setValidating(null)} />}
+
+      {/* ── Validate All confirmation ─────────────────────────────────────── */}
+      {confirmValidateAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="dark:bg-dark-800 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                <CheckCircleIcon className="size-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h2 className="dark:text-dark-100 text-lg font-semibold text-gray-800">Validate All</h2>
+            </div>
+            <p className="dark:text-dark-300 text-sm text-gray-600">
+              Validasi semua hasil <strong>Pending</strong>
+              {fSample ? " pada filter yang aktif" : " di seluruh data"}?
+            </p>
+            <p className="dark:text-dark-400 mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/10 dark:text-amber-400">
+              Hasil yang <strong>out-of-control</strong> (ditolak Westgard) akan dilewati dan harus direview manual.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button onClick={() => setConfirmValidateAll(false)} disabled={validatingAll}
+                className="dark:text-dark-300 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-dark-600 dark:hover:bg-dark-700">
+                Batal
+              </button>
+              <button onClick={handleValidateAll} disabled={validatingAll}
+                className="bg-blue-600 hover:bg-blue-700 rounded-lg px-5 py-2 text-sm font-medium text-white disabled:opacity-60">
+                {validatingAll ? "Memvalidasi…" : "Ya, Validate All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       </div>
       </div>

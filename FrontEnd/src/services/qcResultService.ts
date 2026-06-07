@@ -133,6 +133,10 @@ const qcResultService = {
   validate: (id: string, payload: { reject: boolean; note?: string }) =>
     api.post(`/api/qcresults/${id}/validate`, payload),
 
+  batchValidate: (payload: { resultIds?: string[]; qcSampleId?: string; testFileParameterId?: string }) =>
+    api.post<{ data: { validatedCount: number; skippedCount: number }; message: string }>(
+      "/api/qcresults/batch-validate", payload),
+
   cancelValidation: (id: string, reason: string) =>
     api.post(`/api/qcresults/${id}/cancel-validation`, { reason }),
 
