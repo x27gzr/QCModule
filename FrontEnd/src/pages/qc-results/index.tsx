@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PlusIcon, ArrowPathIcon, ChartBarIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, ClockIcon, ShieldCheckIcon, FunnelIcon, EyeIcon, EyeSlashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -74,35 +74,38 @@ const entrySchema = z.object({
 });
 type EntryForm = z.infer<typeof entrySchema>;
 
-function EntryModal({ onSave, onClose, defaultSampleId }: {
+function EntryModal({ onSave, onClose, defaultSampleId, defaultParamId }: {
   onSave: (data: EntryForm) => Promise<string>;
   onClose: () => void;
   defaultSampleId?: string;
+  defaultParamId?: string;
 }) {
   const [samples,    setSamples]    = useState<QCSampleSummaryDto[]>([]);
   const [params,     setParams]     = useState<{ id: string; label: string }[]>([]);
   const [selectedSample, setSelectedSample] = useState(defaultSampleId ?? "");
   const [savedMsg,   setSavedMsg]   = useState<string | null>(null);
+  const firstParamLoad = useRef(true);
 
   const { register, handleSubmit, setValue, setError, formState: { errors, isSubmitting } } = useForm<EntryForm>({
     resolver: zodResolver(entrySchema),
-    defaultValues: { resultDate: dayjs().format("YYYY-MM-DDTHH:mm"), qcSampleId: defaultSampleId ?? "" },
+    defaultValues: { resultDate: dayjs().format("YYYY-MM-DDTHH:mm"), qcSampleId: defaultSampleId ?? "", testFileParameterId: defaultParamId ?? "" },
   });
 
   useEffect(() => {
     qcSampleService.getAll({ isActive: true, pageSize: 200 }).then(r => setSamples(r.data.data.items));
   }, []);
 
-  // Load parameters from targets when sample changes
+  // Load parameters from targets when sample changes; prefill the filtered parameter on first load
   useEffect(() => {
-    if (selectedSample) {
-      qcResultService.getTargets(selectedSample).then(r =>
-        setParams(r.data.data.map(t => ({ id: t.testFileParameterId, label: t.parameterName }))));
-    } else {
-      setParams([]);
-    }
-    setValue("testFileParameterId", "");
-  }, [selectedSample, setValue]);
+    if (!selectedSample) { setParams([]); setValue("testFileParameterId", ""); return; }
+    qcResultService.getTargets(selectedSample).then(r => {
+      const list = r.data.data.map(t => ({ id: t.testFileParameterId, label: t.parameterName }));
+      setParams(list);
+      const useDefault = firstParamLoad.current && defaultParamId && list.some(p => p.id === defaultParamId);
+      setValue("testFileParameterId", useDefault ? defaultParamId! : "");
+      firstParamLoad.current = false;
+    });
+  }, [selectedSample, setValue, defaultParamId]);
 
   const onSubmit = async (data: EntryForm) => {
     try {
@@ -134,7 +137,7 @@ function EntryModal({ onSave, onClose, defaultSampleId }: {
           <div>
             <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">QC Sample *</label>
             <select {...register("qcSampleId")} className={inputCls}
-              onChange={e => { setValue("qcSampleId", e.target.value); setSelectedSample(e.target.value); }}>
+              onChange={e => { setValue("qcSampleId", e.target.value); setSelectedSample(e.target.value); setValue("testFileParameterId", ""); }}>
               <option value="">Select QC sample…</option>
               {samples.map(s => <option key={s.id} value={s.id}>{s.name} — {s.level} (Lot: {s.lotNumber})</option>)}
             </select>
@@ -785,7 +788,7 @@ export default function QCResultsPage() {
         )}
       </div>
 
-      {showEntry  && <EntryModal onSave={handleEntry} defaultSampleId={fSample || undefined} onClose={() => { setShowEntry(false); load(); }} />}
+      {showEntry  && <EntryModal onSave={handleEntry} defaultSampleId={fSample || undefined} defaultParamId={fParam || undefined} onClose={() => { setShowEntry(false); load(); }} />}
       {editing    && <EditModal result={editing} onSave={handleEdit} onClose={() => setEditing(null)} />}
       {deleting   && <DeleteResultModal result={deleting} onConfirm={handleDelete} onClose={() => setDeleting(null)} />}
       {cancelling && <CancelValidationModal result={cancelling} onConfirm={handleCancelValidation} onClose={() => setCancelling(null)} />}
