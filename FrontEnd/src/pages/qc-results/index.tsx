@@ -941,8 +941,8 @@ export default function QCResultsPage() {
                 )}
               </div>
 
-              {/* ── Kanan: Z-score chart ─────────────────────────────── */}
-              <div className="min-w-0 flex-1 overflow-hidden px-2 py-1">
+              {/* ── Kanan: Z-score chart (proporsional, terpusat) ──────── */}
+              <div className="flex min-w-0 flex-1 items-center justify-center overflow-hidden px-3 py-2">
                 {!ljData.hasTarget ? (
                   <div className="flex h-full flex-col items-center justify-center text-center">
                     <ExclamationTriangleIcon className="mb-2 size-8 text-amber-400" />
@@ -953,14 +953,15 @@ export default function QCResultsPage() {
                     <p className="text-sm text-gray-400 dark:text-dark-500">Belum ada data QC</p>
                   </div>
                 ) : (
-                  <LeveyJenningsChart
-                    data={ljData}
-                    westgardRules={ljRules ?? undefined}
-                    showViolations={false}
-                    fillHeight={true}
-                    rangeFrom={ljFrom || undefined}
-                    rangeTo={ljTo || undefined}
-                  />
+                  <div className="mx-auto w-full max-w-[840px]">
+                    <LeveyJenningsChart
+                      data={ljData}
+                      westgardRules={ljRules ?? undefined}
+                      showViolations={false}
+                      rangeFrom={ljFrom || undefined}
+                      rangeTo={ljTo || undefined}
+                    />
+                  </div>
                 )}
               </div>
             </div>

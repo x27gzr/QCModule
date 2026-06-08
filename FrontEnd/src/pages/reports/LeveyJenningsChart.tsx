@@ -5,7 +5,7 @@ import type { WestgardRules } from "@/services/qcSampleService";
 
 // ── Chart layout constants ────────────────────────────────────────────────────
 const W   = 900;
-const H   = 260;
+const H   = 300;
 const PAD = { top: 24, right: 56, bottom: 34, left: 56 };
 const PW  = W - PAD.left - PAD.right;
 const PH  = H - PAD.top  - PAD.bottom;
