@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   PlusIcon, MagnifyingGlassIcon, PencilSquareIcon,
   TrashIcon, ArrowPathIcon, ClipboardDocumentListIcon,
-  ExclamationTriangleIcon, AdjustmentsHorizontalIcon,
+  ExclamationTriangleIcon, AdjustmentsHorizontalIcon, CalculatorIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "sonner";
 import dayjs from "dayjs";
@@ -10,6 +10,7 @@ import qcSampleService, { type QCSampleSummaryDto, type QCSampleDto } from "@/se
 import instrumentService, { type InstrumentSummaryDto } from "@/services/instrumentService";
 import QCSampleFormModal from "./QCSampleFormModal";
 import QCSampleTargetsModal from "./QCSampleTargetsModal";
+import QCSampleEstablishModal from "./QCSampleEstablishModal";
 import DeleteModal from "@/pages/users/DeleteModal";
 import { useAuth } from "@/contexts/auth/context";
 import { getErrorMessage } from "@/utils/apiError";
@@ -46,6 +47,7 @@ export default function QCSamplesPage() {
   const [target,        setTarget]        = useState<QCSampleSummaryDto | null>(null);
   const [detail,        setDetail]        = useState<QCSampleDto | null>(null);
   const [targetsSample, setTargetsSample] = useState<QCSampleSummaryDto | null>(null);
+  const [estSample,     setEstSample]     = useState<QCSampleSummaryDto | null>(null);
 
   const pageSize = 10;
 
@@ -193,6 +195,13 @@ export default function QCSamplesPage() {
                     </button>
                     {canManage && (
                       <>
+                        <button
+                          onClick={() => setEstSample(item)}
+                          title="Establish Mean (hitung target dari data)"
+                          className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20">
+                          <CalculatorIcon className="size-4" />
+                          Establish
+                        </button>
                         <button onClick={() => openEdit(item)}
                           className="dark:text-dark-300 dark:hover:bg-dark-600 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100" title="Edit">
                           <PencilSquareIcon className="size-4" />
@@ -239,6 +248,13 @@ export default function QCSamplesPage() {
           qcSampleId={targetsSample.id}
           sampleName={`${targetsSample.name} — ${targetsSample.level}`}
           onClose={() => setTargetsSample(null)}
+        />
+      )}
+      {estSample && (
+        <QCSampleEstablishModal
+          qcSampleId={estSample.id}
+          sampleName={`${estSample.name} — ${estSample.level} (Lot: ${estSample.lotNumber})`}
+          onClose={() => setEstSample(null)}
         />
       )}
     </div>

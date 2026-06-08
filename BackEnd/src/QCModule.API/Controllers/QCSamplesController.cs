@@ -5,9 +5,11 @@ using QCModule.Application.Common.Authorization;
 using QCModule.Application.Common.Models;
 using QCModule.Application.Features.QCSamples.Commands.CreateQCSample;
 using QCModule.Application.Features.QCSamples.Commands.DeleteQCSample;
+using QCModule.Application.Features.QCSamples.Commands.EstablishMean;
 using QCModule.Application.Features.QCSamples.Commands.UpdateQCSample;
 using QCModule.Application.Features.QCSamples.Commands.UpsertTarget;
 using QCModule.Application.Features.QCSamples.DTOs;
+using QCModule.Application.Features.QCSamples.Queries.GetEstablishPreview;
 using QCModule.Application.Features.QCSamples.Queries.GetQCSampleById;
 using QCModule.Application.Features.QCSamples.Queries.GetQCSamples;
 using QCModule.Application.Features.QCSamples.Queries.GetQCSampleTargets;
@@ -63,7 +65,27 @@ public class QCSamplesController(IMediator mediator) : ControllerBase
         Guid id, [FromBody] UpsertTargetRequest body, CancellationToken ct)
         => Ok(await mediator.Send(
             new UpsertTargetCommand(id, body.TestFileParameterId, body.Mean, body.SD, body.CV, body.Tea, body.TeaUnit), ct));
+
+    // ── Establish Mean (hitung Mean/SD dari data rentang → jadikan target) ────
+    [HttpGet("{id:guid}/establish-preview")]
+    [Authorize(Policy = Permissions.QCSamples.View)]
+    public async Task<ActionResult<Result<IReadOnlyList<EstablishPreviewDto>>>> EstablishPreview(
+        Guid id, [FromQuery] DateTime? dateFrom, [FromQuery] DateTime? dateTo, CancellationToken ct)
+        => Ok(await mediator.Send(new GetEstablishPreviewQuery(id, dateFrom, dateTo), ct));
+
+    [HttpPost("{id:guid}/establish")]
+    [Authorize(Policy = Permissions.QCSamples.Manage)]
+    public async Task<ActionResult<Result<EstablishMeanResult>>> EstablishMean(
+        Guid id, [FromBody] EstablishRequest body, CancellationToken ct)
+        => Ok(await mediator.Send(
+            new EstablishMeanCommand(id, body.DateFrom, body.DateTo, body.TestFileParameterIds), ct));
 }
+
+public record EstablishRequest(
+    DateTime?           DateFrom,
+    DateTime?           DateTo,
+    IReadOnlyList<Guid> TestFileParameterIds
+);
 
 public record UpsertTargetRequest(
     Guid    TestFileParameterId,
