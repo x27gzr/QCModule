@@ -4,9 +4,9 @@ import type { LeveyJenningsDto, LeveyJenningsPoint, QCStatus } from "@/services/
 import type { WestgardRules } from "@/services/qcSampleService";
 
 // ── Chart layout constants ────────────────────────────────────────────────────
-const W   = 820;
-const H   = 360;
-const PAD = { top: 24, right: 54, bottom: 34, left: 54 };
+const W   = 900;
+const H   = 260;
+const PAD = { top: 24, right: 56, bottom: 34, left: 56 };
 const PW  = W - PAD.left - PAD.right;
 const PH  = H - PAD.top  - PAD.bottom;
 
@@ -191,9 +191,9 @@ export default function LeveyJenningsChart({
     });
   }
 
-  const svgStyle = fillHeight ? { width: "100%", height: "100%", display: "block" } : { minWidth: 420 };
+  const svgStyle = fillHeight ? { width: "100%", height: "100%", display: "block" } : { minWidth: 480 };
   const svgClass = fillHeight ? "" : "w-full";
-  const svgPAR   = "xMidYMid meet";   // always proportional (fit + center, never stretch)
+  const svgPAR   = fillHeight ? "none" : "xMidYMid meet";
 
   const hovered = hover !== null ? pts[hover] : null;
 

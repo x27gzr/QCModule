@@ -837,7 +837,7 @@ export default function QCResultsPage() {
       </div>
 
       {/* ── LJ Panel — FIXED di bawah, tidak ikut scroll ─────────────── */}
-      <div className="dark:bg-dark-800 dark:border-dark-600 flex h-[380px] shrink-0 flex-col overflow-hidden border-t border-gray-200 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+      <div className="dark:bg-dark-800 dark:border-dark-600 flex h-[330px] shrink-0 flex-col overflow-hidden border-t border-gray-200 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
         {!ljParamId ? (
           /* Placeholder */
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
@@ -941,8 +941,8 @@ export default function QCResultsPage() {
                 )}
               </div>
 
-              {/* ── Kanan: Z-score chart (proporsional, isi maksimal) ──── */}
-              <div className="min-w-0 flex-1 overflow-hidden p-2">
+              {/* ── Kanan: Z-score chart ─────────────────────────────── */}
+              <div className="min-w-0 flex-1 overflow-hidden px-2 py-1">
                 {!ljData.hasTarget ? (
                   <div className="flex h-full flex-col items-center justify-center text-center">
                     <ExclamationTriangleIcon className="mb-2 size-8 text-amber-400" />
