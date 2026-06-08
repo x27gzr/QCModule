@@ -8,8 +8,12 @@ $FrontEnd = Join-Path $Root "FrontEnd"
 $ApiProject = Join-Path $Root "BackEnd\src\QCModule.API"
 $Wwwroot = Join-Path $ApiProject "wwwroot"
 
-Write-Host "=== Building FrontEnd ===" -ForegroundColor Cyan
+Write-Host "=== Installing FrontEnd dependencies ===" -ForegroundColor Cyan
 Set-Location $FrontEnd
+npm install
+if ($LASTEXITCODE -ne 0) { Write-Error "npm install failed"; exit 1 }
+
+Write-Host "=== Building FrontEnd ===" -ForegroundColor Cyan
 npx vite build
 if ($LASTEXITCODE -ne 0) { Write-Error "Frontend build failed"; exit 1 }
 
