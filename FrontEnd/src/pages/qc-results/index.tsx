@@ -91,21 +91,29 @@ function EntryModal({ onSave, onClose, defaultSampleId, defaultParamId }: {
     defaultValues: { resultDate: dayjs().format("YYYY-MM-DDTHH:mm"), qcSampleId: defaultSampleId ?? "", testFileParameterId: defaultParamId ?? "" },
   });
 
+  // Load samples; re-apply default sample once its option exists
   useEffect(() => {
-    qcSampleService.getAll({ isActive: true, pageSize: 200 }).then(r => setSamples(r.data.data.items));
-  }, []);
-
-  // Load parameters from targets when sample changes; prefill the filtered parameter on first load
-  useEffect(() => {
-    if (!selectedSample) { setParams([]); setValue("testFileParameterId", ""); return; }
-    qcResultService.getTargets(selectedSample).then(r => {
-      const list = r.data.data.map(t => ({ id: t.testFileParameterId, label: t.parameterName }));
-      setParams(list);
-      const useDefault = firstParamLoad.current && defaultParamId && list.some(p => p.id === defaultParamId);
-      setValue("testFileParameterId", useDefault ? defaultParamId! : "");
-      firstParamLoad.current = false;
+    qcSampleService.getAll({ isActive: true, pageSize: 200 }).then(r => {
+      setSamples(r.data.data.items);
+      if (defaultSampleId && r.data.data.items.some(s => s.id === defaultSampleId))
+        setValue("qcSampleId", defaultSampleId);
     });
-  }, [selectedSample, setValue, defaultParamId]);
+  }, [defaultSampleId, setValue]);
+
+  // Fetch parameters whenever the selected sample changes
+  useEffect(() => {
+    if (!selectedSample) { setParams([]); return; }
+    qcResultService.getTargets(selectedSample).then(r =>
+      setParams(r.data.data.map(t => ({ id: t.testFileParameterId, label: t.parameterName }))));
+  }, [selectedSample]);
+
+  // Apply the filtered parameter ONCE, after its option is rendered (avoids select race)
+  useEffect(() => {
+    if (!firstParamLoad.current || params.length === 0) return;
+    if (defaultParamId && params.some(p => p.id === defaultParamId))
+      setValue("testFileParameterId", defaultParamId);
+    firstParamLoad.current = false;
+  }, [params, defaultParamId, setValue]);
 
   const onSubmit = async (data: EntryForm) => {
     try {
@@ -137,7 +145,7 @@ function EntryModal({ onSave, onClose, defaultSampleId, defaultParamId }: {
           <div>
             <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">QC Sample *</label>
             <select {...register("qcSampleId")} className={inputCls}
-              onChange={e => { setValue("qcSampleId", e.target.value); setSelectedSample(e.target.value); setValue("testFileParameterId", ""); }}>
+              onChange={e => { firstParamLoad.current = false; setValue("qcSampleId", e.target.value); setSelectedSample(e.target.value); setValue("testFileParameterId", ""); }}>
               <option value="">Select QC sample…</option>
               {samples.map(s => <option key={s.id} value={s.id}>{s.name} — {s.level} (Lot: {s.lotNumber})</option>)}
             </select>
