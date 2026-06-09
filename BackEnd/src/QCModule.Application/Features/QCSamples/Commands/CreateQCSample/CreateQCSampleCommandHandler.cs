@@ -30,12 +30,16 @@ public class CreateQCSampleCommandHandler(
             IsActive     = request.IsActive,
             Rule1_2s     = r.Rule1_2s,
             Rule1_3s     = r.Rule1_3s,
-            Rule3_1s     = r.Rule3_1s,
             Rule2_2s     = r.Rule2_2s,
-            RuleR_4s     = r.RuleR_4s,
+            Rule2_2sDiff = r.Rule2_2sDiff,
             Rule4_1s     = r.Rule4_1s,
-            Rule9x       = r.Rule9x,
             Rule10x      = r.Rule10x,
+            Rule7T       = r.Rule7T,
+            RejectSD     = r.RejectSD <= 0 ? 3.0 : r.RejectSD,
+            NxCount      = r.NxCount  <  2 ? 10  : r.NxCount,
+            Rule3_1s     = r.Rule3_1s,
+            RuleR_4s     = r.RuleR_4s,
+            Rule9x       = r.Rule9x,
         };
 
         await sampleRepo.AddAsync(sample, cancellationToken);
@@ -51,6 +55,7 @@ public class CreateQCSampleCommandHandler(
         s.IsActive,
         s.ExpiryDate < now,
         s.ExpiryDate >= now && s.ExpiryDate < now.AddDays(30),
-        new WestgardRulesDto(s.Rule1_2s, s.Rule1_3s, s.Rule3_1s, s.Rule2_2s, s.RuleR_4s, s.Rule4_1s, s.Rule9x, s.Rule10x),
+        new WestgardRulesDto(s.Rule1_2s, s.Rule1_3s, s.Rule2_2s, s.Rule2_2sDiff, s.Rule4_1s, s.Rule10x, s.Rule7T,
+            s.RejectSD, s.NxCount, s.Rule3_1s, s.RuleR_4s, s.Rule9x),
         s.CreatedAt);
 }

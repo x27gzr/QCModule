@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using QCModule.Application.Common;
 using QCModule.Application.Common.Interfaces;
 using QCModule.Domain.Entities;
 using QCModule.Domain.Enums;
@@ -155,7 +156,9 @@ public class ResFileWatcherService(
             targetMap.TryGetValue(param.Id, out var target);
 
             var eval = target != null
-                ? await westgard.EvaluateAsync(value, target.Mean, target.SD, ct)
+                ? await westgard.EvaluateAsync(
+                    sample.Id, param.Id, value, target.Mean, target.SD,
+                    WestgardEvaluator.RulesOf(sample), ct: ct)
                 : new WestgardResult(QCStatus.Pending, string.Empty, 0);
 
             db.QCResults.Add(new QCResult

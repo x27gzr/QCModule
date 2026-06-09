@@ -1,4 +1,5 @@
 using MediatR;
+using QCModule.Application.Common;
 using QCModule.Application.Common.Interfaces;
 using QCModule.Application.Common.Models;
 using QCModule.Application.Features.QCResults.DTOs;
@@ -40,7 +41,10 @@ public class CreateQCResultCommandHandler(
 
         WestgardResult evaluation;
         if (target is not null)
-            evaluation = await westgard.EvaluateAsync(request.Value, target.Mean, target.SD, cancellationToken);
+            evaluation = await westgard.EvaluateAsync(
+                request.QCSampleId, request.TestFileParameterId, request.Value,
+                target.Mean, target.SD, WestgardEvaluator.RulesOf(sample),
+                ct: cancellationToken);
         else
             evaluation = new WestgardResult(QCStatus.Pending, string.Empty, 0);
 

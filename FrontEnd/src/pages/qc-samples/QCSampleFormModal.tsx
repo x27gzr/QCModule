@@ -16,31 +16,21 @@ const schema = z.object({
   expiryDate:   z.string().min(1, "Expiry date is required"),
   instrumentId: z.string().min(1, "Instrument is required"),
   isActive:     z.boolean(),
-  // Westgard rules
-  rule1_2s: z.boolean(),
-  rule1_3s: z.boolean(),
-  rule3_1s: z.boolean(),
-  rule2_2s: z.boolean(),
-  ruleR_4s: z.boolean(),
-  rule4_1s: z.boolean(),
-  rule9x:   z.boolean(),
-  rule10x:  z.boolean(),
+  // Westgard rules (within-material)
+  rule1_2s:     z.boolean(),
+  rule1_3s:     z.boolean(),
+  rule2_2s:     z.boolean(),
+  rule2_2sDiff: z.boolean(),
+  rule4_1s:     z.boolean(),
+  rule10x:      z.boolean(),
+  rule7T:       z.boolean(),
+  rejectSD:     z.coerce.number().min(2, "2–6").max(6, "2–6"),
+  nxCount:      z.coerce.number().int().min(2, "2–20").max(20, "2–20"),
 });
 
 type FormValues = z.infer<typeof schema>;
 
 const LEVELS = ["Level 1", "Level 2", "Level 3"];
-
-const WESTGARD_RULES = [
-  { key: "rule1_2s", label: "1-2s",  desc: "Warning"         },
-  { key: "rule1_3s", label: "1-3s",  desc: "Out of Control"  },
-  { key: "rule3_1s", label: "3-1s",  desc: "Warning"         },
-  { key: "rule2_2s", label: "2-2s",  desc: "Systematic"      },
-  { key: "ruleR_4s", label: "R-4s",  desc: "Random"          },
-  { key: "rule4_1s", label: "4-1s",  desc: "Trend"           },
-  { key: "rule9x",   label: "9x",    desc: "Warning"         },
-  { key: "rule10x",  label: "10x",   desc: "Shift"           },
-] as const;
 
 interface Props {
   mode:        "create" | "edit";
@@ -84,12 +74,13 @@ export default function QCSampleFormModal({ mode, item, instruments, onSave, onC
         isActive:     item.isActive,
         rule1_2s:     r.rule1_2s,
         rule1_3s:     r.rule1_3s,
-        rule3_1s:     r.rule3_1s,
         rule2_2s:     r.rule2_2s,
-        ruleR_4s:     r.ruleR_4s,
+        rule2_2sDiff: r.rule2_2sDiff,
         rule4_1s:     r.rule4_1s,
-        rule9x:       r.rule9x,
         rule10x:      r.rule10x,
+        rule7T:       r.rule7T,
+        rejectSD:     r.rejectSD || 3,
+        nxCount:      r.nxCount  || 10,
       });
     }
   }, [item, isEdit, reset]);
@@ -104,14 +95,19 @@ export default function QCSampleFormModal({ mode, item, instruments, onSave, onC
         instrumentId: data.instrumentId,
         isActive:     data.isActive,
         westgardRules: {
-          rule1_2s: data.rule1_2s,
-          rule1_3s: data.rule1_3s,
-          rule3_1s: data.rule3_1s,
-          rule2_2s: data.rule2_2s,
-          ruleR_4s: data.ruleR_4s,
-          rule4_1s: data.rule4_1s,
-          rule9x:   data.rule9x,
-          rule10x:  data.rule10x,
+          rule1_2s:     data.rule1_2s,
+          rule1_3s:     data.rule1_3s,
+          rule2_2s:     data.rule2_2s,
+          rule2_2sDiff: data.rule2_2sDiff,
+          rule4_1s:     data.rule4_1s,
+          rule10x:      data.rule10x,
+          rule7T:       data.rule7T,
+          rejectSD:     data.rejectSD,
+          nxCount:      data.nxCount,
+          // legacy across-material (Phase 2) — preserve existing, default off
+          rule3_1s: item?.westgardRules.rule3_1s ?? false,
+          ruleR_4s: item?.westgardRules.ruleR_4s ?? false,
+          rule9x:   item?.westgardRules.rule9x   ?? false,
         },
       });
       toast.success(isEdit ? "QC Sample updated." : "QC Sample created.");
@@ -176,21 +172,72 @@ export default function QCSampleFormModal({ mode, item, instruments, onSave, onC
               </label>
             </div>
 
-            {/* Westgard Rules */}
+            {/* Westgard Rules — Within Material */}
             <div className="border-t border-gray-100 pt-4 dark:border-dark-600">
-              <p className="mb-3 text-sm font-semibold text-gray-700 dark:text-dark-200">Westgard Rules</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {WESTGARD_RULES.map(({ key, label, desc }) => (
-                  <label key={key}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 p-3 hover:bg-gray-50 dark:border-dark-600 dark:hover:bg-dark-700">
-                    <input {...register(key as keyof FormValues)} type="checkbox"
-                      className="size-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                    <span className="text-sm">
-                      <span className="font-medium text-gray-800 dark:text-dark-100">{label}</span>
-                      <span className="ml-1 text-xs text-gray-400 dark:text-dark-400">({desc})</span>
-                    </span>
-                  </label>
-                ))}
+              <p className="mb-1 text-sm font-semibold text-gray-700 dark:text-dark-200">Westgard Flagging</p>
+              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-dark-400">Within Material</p>
+
+              <div className="space-y-1">
+                {/* 1:2s — Warning */}
+                <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-dark-700">
+                  <input {...register("rule1_2s")} type="checkbox"
+                    className="size-4 rounded border-gray-300 text-amber-500 focus:ring-amber-400" />
+                  <span className="text-sm text-amber-600 dark:text-amber-400">Warning: Outside 2 SD <span className="text-gray-400">(1:2s)</span></span>
+                </label>
+
+                {/* 1:Ns — Reject, configurable SD */}
+                <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-dark-700">
+                  <input {...register("rule1_3s")} type="checkbox"
+                    className="size-4 rounded border-gray-300 text-red-500 focus:ring-red-400" />
+                  <span className="flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400">
+                    Reject: Outside
+                    <input {...register("rejectSD")} type="number" step="0.5" min={2} max={6}
+                      className="w-14 rounded border border-gray-200 px-1.5 py-0.5 text-center text-xs text-gray-800 dark:border-dark-600 dark:bg-dark-900 dark:text-dark-100" />
+                    SD
+                  </span>
+                </label>
+                {errors.rejectSD && <p className="px-2 text-xs text-red-500">SD must be {errors.rejectSD.message}</p>}
+
+                {/* 2:2s same side */}
+                <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-dark-700">
+                  <input {...register("rule2_2s")} type="checkbox"
+                    className="size-4 rounded border-gray-300 text-red-500 focus:ring-red-400" />
+                  <span className="text-sm text-red-600 dark:text-red-400">Reject: 2 consecutive outside 2 SD at same side of mean <span className="text-gray-400">(2:2s)</span></span>
+                </label>
+
+                {/* R:4s — 2 consecutive outside 2SD different side */}
+                <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-dark-700">
+                  <input {...register("rule2_2sDiff")} type="checkbox"
+                    className="size-4 rounded border-gray-300 text-red-500 focus:ring-red-400" />
+                  <span className="text-sm text-red-600 dark:text-red-400">Reject: 2 consecutive outside 2 SD at different side of mean <span className="text-gray-400">(R:4s)</span></span>
+                </label>
+
+                {/* 4:1s */}
+                <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-dark-700">
+                  <input {...register("rule4_1s")} type="checkbox"
+                    className="size-4 rounded border-gray-300 text-red-500 focus:ring-red-400" />
+                  <span className="text-sm text-red-600 dark:text-red-400">Reject: 4 consecutive outside 1 SD at same side of mean <span className="text-gray-400">(4:1s)</span></span>
+                </label>
+
+                {/* N:x — configurable count */}
+                <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-dark-700">
+                  <input {...register("rule10x")} type="checkbox"
+                    className="size-4 rounded border-gray-300 text-red-500 focus:ring-red-400" />
+                  <span className="flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400">
+                    Reject:
+                    <input {...register("nxCount")} type="number" step="1" min={2} max={20}
+                      className="w-14 rounded border border-gray-200 px-1.5 py-0.5 text-center text-xs text-gray-800 dark:border-dark-600 dark:bg-dark-900 dark:text-dark-100" />
+                    consecutive same side of mean
+                  </span>
+                </label>
+                {errors.nxCount && <p className="px-2 text-xs text-red-500">N must be {errors.nxCount.message}</p>}
+
+                {/* 7T — trend */}
+                <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-dark-700">
+                  <input {...register("rule7T")} type="checkbox"
+                    className="size-4 rounded border-gray-300 text-red-500 focus:ring-red-400" />
+                  <span className="text-sm text-red-600 dark:text-red-400">Reject: 7 consecutive trend in same direction <span className="text-gray-400">(7T)</span></span>
+                </label>
               </div>
             </div>
 

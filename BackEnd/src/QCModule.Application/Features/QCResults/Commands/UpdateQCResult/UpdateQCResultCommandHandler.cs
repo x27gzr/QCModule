@@ -1,4 +1,5 @@
 using MediatR;
+using QCModule.Application.Common;
 using QCModule.Application.Common.Interfaces;
 using QCModule.Application.Common.Models;
 using QCModule.Application.Features.QCResults.DTOs;
@@ -28,14 +29,20 @@ public class UpdateQCResultCommandHandler(
             throw new InvalidOperationException("Only pending results can be edited.");
 
         // Re-evaluate Westgard with new value
+        var samples = await sampleRepo.FindAsync(s => s.Id == result.QCSampleId, cancellationToken);
+        var sample  = samples.FirstOrDefault();
+
         var targets = await targetRepo.FindAsync(
             t => t.QCSampleId == result.QCSampleId && t.TestFileParameterId == result.TestFileParameterId,
             cancellationToken);
         var target = targets.FirstOrDefault();
 
         WestgardResult evaluation;
-        if (target is not null)
-            evaluation = await westgard.EvaluateAsync(request.Value, target.Mean, target.SD, cancellationToken);
+        if (target is not null && sample is not null)
+            evaluation = await westgard.EvaluateAsync(
+                result.QCSampleId, result.TestFileParameterId, request.Value,
+                target.Mean, target.SD, WestgardEvaluator.RulesOf(sample),
+                excludeResultId: result.Id, ct: cancellationToken);
         else
             evaluation = new WestgardResult(QCStatus.Pending, string.Empty, 0);
 
@@ -49,8 +56,6 @@ public class UpdateQCResultCommandHandler(
         await resultRepo.UpdateAsync(result, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var samples = await sampleRepo.FindAsync(s => s.Id == result.QCSampleId, cancellationToken);
-        var sample  = samples.FirstOrDefault();
         var params_ = await paramRepo.FindAsync(p => p.Id == result.TestFileParameterId, cancellationToken);
         var param   = params_.FirstOrDefault();
         var users   = await userRepo.FindAsync(u => u.Id == result.UserId, cancellationToken);

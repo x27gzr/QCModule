@@ -1,43 +1,42 @@
+using QCModule.Application.Common;
 using QCModule.Application.Common.Interfaces;
 using QCModule.Domain.Entities;
-using QCModule.Domain.Enums;
 using QCModule.Domain.Interfaces;
 
 namespace QCModule.Infrastructure.Services;
 
-public class WestgardService(IRepository<WestgardRule> ruleRepo) : IWestgardService
+/// <summary>
+/// Within-material Westgard evaluation: pulls this sample+parameter's result history,
+/// appends the new value as the newest point, and runs the pure multirule evaluator.
+/// </summary>
+public class WestgardService(IRepository<QCResult> resultRepo) : IWestgardService
 {
-    public async Task<WestgardResult> EvaluateAsync(double value, double mean, double sd, CancellationToken ct = default)
+    public async Task<WestgardResult> EvaluateAsync(
+        Guid              qcSampleId,
+        Guid              testFileParameterId,
+        double            newValue,
+        double            mean,
+        double            sd,
+        WestgardRuleSet   rules,
+        Guid?             excludeResultId = null,
+        CancellationToken ct = default)
     {
-        var zScore = sd > 0 ? (value - mean) / sd : 0;
-        var rules  = await ruleRepo.FindAsync(r => r.IsEnabled, ct);
+        // Prior points for this level's chart, oldest→newest.
+        // (FindAsync already excludes soft-deleted results via the global query filter.)
+        var history = await resultRepo.FindAsync(
+            r => r.QCSampleId == qcSampleId
+              && r.TestFileParameterId == testFileParameterId
+              && (excludeResultId == null || r.Id != excludeResultId),
+            ct);
 
-        var flags        = new List<string>();
-        var isRejection  = false;
-        var isWarning    = false;
+        var series = history
+            .OrderBy(r => r.ResultDate)
+            .ThenBy(r => r.CreatedAt)
+            .Select(r => r.Value)
+            .ToList();
 
-        foreach (var rule in rules.OrderBy(r => r.RuleCode))
-        {
-            var absZ = Math.Abs(zScore);
-            var violated = rule.RuleCode switch
-            {
-                "1:3s" => absZ > 3.0,
-                "1:2s" => absZ > 2.0,
-                _      => false
-            };
+        series.Add(newValue); // the point being evaluated is always the newest
 
-            if (!violated) continue;
-
-            flags.Add(rule.RuleCode);
-            if (rule.IsRejection) isRejection = true;
-            if (rule.IsWarning)   isWarning   = true;
-        }
-
-        var status = isRejection ? QCStatus.Rejected
-                   : isWarning   ? QCStatus.Warning
-                   : flags.Count > 0 ? QCStatus.Warning
-                   : QCStatus.Accepted;
-
-        return new WestgardResult(status, string.Join(", ", flags), Math.Round(zScore, 3));
+        return WestgardEvaluator.Evaluate(series, mean, sd, rules);
     }
 }

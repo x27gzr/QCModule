@@ -2,25 +2,35 @@ import api from "@/utils/axios";
 import type { PaginatedResult } from "./instrumentService";
 
 export interface WestgardRules {
-  rule1_2s: boolean;
-  rule1_3s: boolean;
-  rule3_1s: boolean;
-  rule2_2s: boolean;
-  ruleR_4s: boolean;
-  rule4_1s: boolean;
-  rule9x:   boolean;
-  rule10x:  boolean;
+  // Within-material rules (evaluated on this level's own time series)
+  rule1_2s:     boolean;  // Warning: outside 2SD
+  rule1_3s:     boolean;  // Reject: outside N SD
+  rule2_2s:     boolean;  // Reject: 2 consecutive outside 2SD, same side
+  rule2_2sDiff: boolean;  // Reject: 2 consecutive outside 2SD, different side (R:4s)
+  rule4_1s:     boolean;  // Reject: 4 consecutive outside 1SD, same side
+  rule10x:      boolean;  // Reject: N consecutive same side of mean
+  rule7T:       boolean;  // Reject: 7 consecutive trend, same direction
+  rejectSD:     number;   // SD multiplier for the 1:Ns reject rule (default 3)
+  nxCount:      number;   // N for the "N consecutive same side" rule (default 10)
+  // Legacy / Phase-2 (across-material) — not yet evaluated, kept for compatibility
+  rule3_1s:     boolean;
+  ruleR_4s:     boolean;
+  rule9x:       boolean;
 }
 
 export const DEFAULT_WESTGARD_RULES: WestgardRules = {
-  rule1_2s: true,
-  rule1_3s: true,
-  rule3_1s: false,
-  rule2_2s: false,
-  ruleR_4s: false,
-  rule4_1s: false,
-  rule9x:   false,
-  rule10x:  false,
+  rule1_2s:     true,
+  rule1_3s:     true,
+  rule2_2s:     false,
+  rule2_2sDiff: false,
+  rule4_1s:     false,
+  rule10x:      false,
+  rule7T:       false,
+  rejectSD:     3,
+  nxCount:      10,
+  rule3_1s:     false,
+  ruleR_4s:     false,
+  rule9x:       false,
 };
 
 export interface QCSampleDto {

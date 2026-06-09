@@ -33,12 +33,16 @@ public class UpdateQCSampleCommandHandler(
         sample.IsActive     = request.IsActive;
         sample.Rule1_2s     = r.Rule1_2s;
         sample.Rule1_3s     = r.Rule1_3s;
-        sample.Rule3_1s     = r.Rule3_1s;
         sample.Rule2_2s     = r.Rule2_2s;
-        sample.RuleR_4s     = r.RuleR_4s;
+        sample.Rule2_2sDiff = r.Rule2_2sDiff;
         sample.Rule4_1s     = r.Rule4_1s;
-        sample.Rule9x       = r.Rule9x;
         sample.Rule10x      = r.Rule10x;
+        sample.Rule7T       = r.Rule7T;
+        sample.RejectSD     = r.RejectSD <= 0 ? 3.0 : r.RejectSD;
+        sample.NxCount      = r.NxCount  <  2 ? 10  : r.NxCount;
+        sample.Rule3_1s     = r.Rule3_1s;
+        sample.RuleR_4s     = r.RuleR_4s;
+        sample.Rule9x       = r.Rule9x;
 
         await sampleRepo.UpdateAsync(sample, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
