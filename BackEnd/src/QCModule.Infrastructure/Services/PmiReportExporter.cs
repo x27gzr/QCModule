@@ -19,23 +19,80 @@ public class PmiReportExporter : IPmiReportExporter
     private static readonly string[] RandomRules     = ["1:", "R:4s"];
     private static readonly string[] SystematicRules = ["2:2s", "4:1s", "7T", "x"];
 
+    // Levey-Jennings grid geometry in the template (Sheet2, block 1):
+    // mean line = row 20, ±2SD = rows 16/24 → 2 rows per SD; plot box spans rows 11-30.
+    private const int    GridMeanRow  = 20;
+    private const double GridRowsPerSd = 2.0;
+    private const int    GridTopRow   = 11;
+    private const int    GridBottomRow = 30;
+
+    // Status colours (shared by grid dots).
+    private const string ColAccepted = "#00B050";
+    private const string ColWarning  = "#FFC000";
+    private const string ColRejected = "#FF0000";
+    private const string ColPending  = "#808080";
+
+    // Chart-data sheet (feeds the native line chart).
+    private const string DataSheet  = "Data LJ";
+    private const string ChartSheet = "Grafik LJ";
+
     public FileExportResult Generate(PmiReportModel model)
     {
         using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(TemplateResource)
             ?? throw new InvalidOperationException($"Embedded template '{TemplateResource}' not found.");
 
-        using var wb = new XLWorkbook(stream);
+        var chartable = model.HasTarget && model.SD > 0 && model.Rows.Count > 0;
 
-        FillWorksheet(wb.Worksheet("Sheet2"), model);
-        FillEvaluation(wb.Worksheet("PMI"),   model);
+        byte[] bytes;
+        using (var wb = new XLWorkbook(stream))
+        {
+            FillWorksheet(wb.Worksheet("Sheet2"), model, chartable);
+            FillEvaluation(wb.Worksheet("PMI"),   model);
+            if (chartable) BuildChartData(wb, model);
 
-        using var output = new MemoryStream();
-        wb.SaveAs(output);
-        return new FileExportResult(output.ToArray(), "PMI.xlsx", XlsxContentType);
+            using var output = new MemoryStream();
+            wb.SaveAs(output);
+            bytes = output.ToArray();
+        }
+
+        // ClosedXML cannot author charts → inject a native line chart via the OpenXML SDK.
+        if (chartable)
+            bytes = LjChartBuilder.AddLineChart(
+                bytes, ChartSheet, DataSheet, model.Rows.Count,
+                $"Levey-Jennings — {model.ParameterName} ({model.Level}) · {model.MonthLabel}");
+
+        return new FileExportResult(bytes, "PMI.xlsx", XlsxContentType);
+    }
+
+    /// <summary>Hidden data sheet that backs the native line chart.</summary>
+    private static void BuildChartData(XLWorkbook wb, PmiReportModel m)
+    {
+        var ws = wb.Worksheets.Add(DataSheet);
+        string[] headers = ["Tanggal", "Nilai", "Mean", "+2SD", "-2SD", "+3SD", "-3SD"];
+        for (var c = 0; c < headers.Length; c++) ws.Cell(1, c + 1).Value = headers[c];
+
+        var plus3  = m.Mean + 3 * m.SD;
+        var minus3 = m.Mean - 3 * m.SD;
+        var r = 2;
+        foreach (var row in m.Rows.OrderBy(x => x.Date))
+        {
+            ws.Cell(r, 1).Value = row.Date;
+            ws.Cell(r, 2).Value = Round(row.Value);
+            ws.Cell(r, 3).Value = Round(m.Mean);
+            ws.Cell(r, 4).Value = Round(m.Plus2SD);
+            ws.Cell(r, 5).Value = Round(m.Minus2SD);
+            ws.Cell(r, 6).Value = Round(plus3);
+            ws.Cell(r, 7).Value = Round(minus3);
+            r++;
+        }
+        ws.Column(1).Style.NumberFormat.Format = "dd-mmm";
+        ws.Hide();
+
+        wb.Worksheets.Add(ChartSheet); // empty; the chart drawing is injected later
     }
 
     // ── Sheet2 : Levey-Jennings monthly worksheet ─────────────────────────────────
-    private static void FillWorksheet(IXLWorksheet ws, PmiReportModel m)
+    private static void FillWorksheet(IXLWorksheet ws, PmiReportModel m, bool plot)
     {
         // Identity block (row 6-8 value cells; labels are pre-printed in the template)
         ws.Cell("AQ6").Value = m.MonthLabel;       // Bulan
@@ -79,7 +136,38 @@ public class PmiReportExporter : IPmiReportExporter
             ws.Cell("C30").Value = Round(sd);
             ws.Cell("C31").Value = mean != 0 ? Round(sd / mean * 100) : 0;
         }
+
+        // Plot each point onto the pre-printed grid: z-score → row, day → column.
+        if (plot && m.SD > 0)
+        {
+            foreach (var row in m.Rows)
+            {
+                var day = row.Date.Day;
+                if (day is < 1 or > 31) continue;
+
+                var z       = (row.Value - m.Mean) / m.SD;
+                var gridRow = Math.Clamp(
+                    (int)Math.Round(GridMeanRow - GridRowsPerSd * z), GridTopRow, GridBottomRow);
+                var gridCol = 7 + 2 * (day - 1); // date 1 → col G(7), 2 → I(9), … 31 → BO(67)
+
+                var cell = ws.Cell(gridRow, gridCol);
+                cell.Value = "●";
+                cell.Style.Font.FontSize  = 8;
+                cell.Style.Font.Bold      = true;
+                cell.Style.Font.FontColor = XLColor.FromHtml(StatusColor(row.Status));
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                cell.Style.Alignment.Vertical   = XLAlignmentVerticalValues.Center;
+            }
+        }
     }
+
+    private static string StatusColor(QCStatus s) => s switch
+    {
+        QCStatus.Accepted => ColAccepted,
+        QCStatus.Warning  => ColWarning,
+        QCStatus.Rejected => ColRejected,
+        _                 => ColPending,
+    };
 
     // ── PMI : monthly evaluation table (column A pre-numbered 1.-31. = day of month) ─
     private static void FillEvaluation(IXLWorksheet ws, PmiReportModel m)

@@ -1,4 +1,7 @@
 using ClosedXML.Excel;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Spreadsheet;
+using DocumentFormat.OpenXml.Validation;
 using QCModule.Application.Common.Interfaces;
 using QCModule.Domain.Enums;
 using QCModule.Infrastructure.Services;
@@ -66,5 +69,40 @@ public class PmiReportExporterTests
         Assert.Equal("Acak (Random)", pmi.Cell("C25").GetString());
         Assert.Equal("1:3s",          pmi.Cell("D25").GetString());
         Assert.Equal("Recalibrated",  pmi.Cell("E25").GetString());
+
+        // Grid plot: day 1 value 101 → z=0.5 → row 20-1=19, col G(7)
+        Assert.Equal("●", ws.Cell(19, 7).GetString());
+        // Chart data + chart sheets exist
+        Assert.True(wb.TryGetWorksheet("Data LJ",   out _));
+        Assert.True(wb.TryGetWorksheet("Grafik LJ", out _));
+    }
+
+    [Fact]
+    public void Generate_ProducesSchemaValidXlsxWithChartPart()
+    {
+        var rows = new List<PmiReportRow>
+        {
+            new(new DateTime(2026, 6, 2),  100, QCStatus.Accepted, null, null),
+            new(new DateTime(2026, 6, 9),  104, QCStatus.Warning,  "1:2s", null),
+            new(new DateTime(2026, 6, 16), 95,  QCStatus.Rejected, "1:3s", "Fix"),
+        };
+
+        IPmiReportExporter exporter = new PmiReportExporter();
+        var file = exporter.Generate(SampleModel(rows));
+
+        using var ms = new MemoryStream(file.Content);
+        using var doc = SpreadsheetDocument.Open(ms, false);
+
+        // The Grafik LJ worksheet must own a chart part.
+        var wbPart = doc.WorkbookPart!;
+        var sheet  = wbPart.Workbook.Descendants<Sheet>().Single(s => s.Name == "Grafik LJ");
+        var wsPart = (WorksheetPart)wbPart.GetPartById(sheet.Id!);
+        Assert.NotEmpty(wsPart.DrawingsPart!.ChartParts);
+
+        // No OpenXML schema violations.
+        var validator = new OpenXmlValidator();
+        var errors = validator.Validate(doc).ToList();
+        Assert.True(errors.Count == 0,
+            "Schema errors:\n" + string.Join("\n", errors.Select(e => $"{e.Path?.XPath}: {e.Description}")));
     }
 }
