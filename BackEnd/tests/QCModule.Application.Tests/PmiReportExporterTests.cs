@@ -99,6 +99,13 @@ public class PmiReportExporterTests
         var wsPart = (WorksheetPart)wbPart.GetPartById(sheet.Id!);
         Assert.NotEmpty(wsPart.DrawingsPart!.ChartParts);
 
+        // Sheet2 must carry the connecting line: 3 points → 2 connectors.
+        var s2     = wbPart.Workbook.Descendants<Sheet>().Single(s => s.Name == "Sheet2");
+        var s2Part = (WorksheetPart)wbPart.GetPartById(s2.Id!);
+        var connectors = s2Part.DrawingsPart!.WorksheetDrawing
+            .Descendants<DocumentFormat.OpenXml.Drawing.Spreadsheet.ConnectionShape>().Count();
+        Assert.Equal(2, connectors);
+
         // No OpenXML schema violations.
         var validator = new OpenXmlValidator();
         var errors = validator.Validate(doc).ToList();

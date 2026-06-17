@@ -44,9 +44,10 @@ public class PmiReportExporter : IPmiReportExporter
         var chartable = model.HasTarget && model.SD > 0 && model.Rows.Count > 0;
 
         byte[] bytes;
+        List<(int Row, int Col)> gridLine;
         using (var wb = new XLWorkbook(stream))
         {
-            FillWorksheet(wb.Worksheet("Sheet2"), model, chartable);
+            gridLine = FillWorksheet(wb.Worksheet("Sheet2"), model, chartable);
             FillEvaluation(wb.Worksheet("PMI"),   model);
             if (chartable) BuildChartData(wb, model);
 
@@ -55,11 +56,13 @@ public class PmiReportExporter : IPmiReportExporter
             bytes = output.ToArray();
         }
 
-        // ClosedXML cannot author charts → inject a native line chart via the OpenXML SDK.
+        // ClosedXML cannot author charts/connectors → post-process with the OpenXML SDK:
+        // a native line chart on "Grafik LJ" + a connecting line through the grid dots on Sheet2.
         if (chartable)
-            bytes = LjChartBuilder.AddLineChart(
+            bytes = LjChartBuilder.AddCharts(
                 bytes, ChartSheet, DataSheet, model.Rows.Count,
-                $"Levey-Jennings — {model.ParameterName} ({model.Level}) · {model.MonthLabel}");
+                $"Levey-Jennings — {model.ParameterName} ({model.Level}) · {model.MonthLabel}",
+                "Sheet2", gridLine);
 
         return new FileExportResult(bytes, "PMI.xlsx", XlsxContentType);
     }
@@ -92,7 +95,8 @@ public class PmiReportExporter : IPmiReportExporter
     }
 
     // ── Sheet2 : Levey-Jennings monthly worksheet ─────────────────────────────────
-    private static void FillWorksheet(IXLWorksheet ws, PmiReportModel m, bool plot)
+    // Returns the date-ordered grid coordinates of plotted points (for the connecting line).
+    private static List<(int Row, int Col)> FillWorksheet(IXLWorksheet ws, PmiReportModel m, bool plot)
     {
         // Identity block (row 6-8 value cells; labels are pre-printed in the template)
         ws.Cell("AQ6").Value = m.MonthLabel;       // Bulan
@@ -138,9 +142,10 @@ public class PmiReportExporter : IPmiReportExporter
         }
 
         // Plot each point onto the pre-printed grid: z-score → row, day → column.
+        var points = new List<(int Row, int Col)>();
         if (plot && m.SD > 0)
         {
-            foreach (var row in m.Rows)
+            foreach (var row in m.Rows.OrderBy(r => r.Date))
             {
                 var day = row.Date.Day;
                 if (day is < 1 or > 31) continue;
@@ -157,8 +162,11 @@ public class PmiReportExporter : IPmiReportExporter
                 cell.Style.Font.FontColor = XLColor.FromHtml(StatusColor(row.Status));
                 cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 cell.Style.Alignment.Vertical   = XLAlignmentVerticalValues.Center;
+
+                points.Add((gridRow, gridCol));
             }
         }
+        return points;
     }
 
     private static string StatusColor(QCStatus s) => s switch

@@ -17,9 +17,16 @@ internal static class LjChartBuilder
     private const uint CatAxisId = 111_111_111U;
     private const uint ValAxisId = 222_222_222U;
 
+    // Grid cell geometry (Sheet2): columns G..BP are 2.0 chars ≈ 14 px wide; rows 11-30 are 12 pt.
+    private const long GridColWidthEmu  = 14L * 9525L;  // px → EMU
+    private const long GridRowHeightEmu = 12L * 12700L; // pt → EMU
+    private const string GridLineColor  = "1F4E79";
+
     private record SeriesSpec(string Name, char Column, string ColorHex, bool Markers, bool Dashed);
 
-    public static byte[] AddLineChart(byte[] xlsx, string chartSheetName, string dataSheetName, int dataRowCount, string title)
+    public static byte[] AddCharts(
+        byte[] xlsx, string chartSheetName, string dataSheetName, int dataRowCount, string title,
+        string gridSheetName, IReadOnlyList<(int Row, int Col)> gridLine)
     {
         using var ms = new MemoryStream();
         ms.Write(xlsx, 0, xlsx.Length);
@@ -28,28 +35,57 @@ internal static class LjChartBuilder
         using (var doc = SpreadsheetDocument.Open(ms, true))
         {
             var wbPart = doc.WorkbookPart!;
-            var sheet  = wbPart.Workbook.Descendants<Sheet>().First(s => s.Name == chartSheetName);
-            var wsPart = (WorksheetPart)wbPart.GetPartById(sheet.Id!);
 
-            var drawingsPart = wsPart.AddNewPart<DrawingsPart>();
+            // 1) Native line chart on the chart sheet.
+            var chartWsPart  = GetWorksheetPart(wbPart, chartSheetName);
+            var drawingsPart = chartWsPart.AddNewPart<DrawingsPart>();
             var chartPart    = drawingsPart.AddNewPart<ChartPart>();
             chartPart.ChartSpace = BuildChartSpace(dataSheetName, dataRowCount, title);
+            BuildChartDrawing(drawingsPart, chartPart);
+            LinkDrawing(chartWsPart, drawingsPart);
 
-            BuildDrawing(drawingsPart, chartPart);
+            // 2) Connecting line through the plotted dots on the form grid.
+            // Sheet2 already owns a DrawingsPart in the template, so reuse it when present.
+            if (gridLine.Count >= 2)
+            {
+                var gridWsPart = GetWorksheetPart(wbPart, gridSheetName);
+                var existing   = gridWsPart.DrawingsPart;
+                var part       = existing ?? gridWsPart.AddNewPart<DrawingsPart>();
 
-            // Link the worksheet to its drawing. Per the CT_Worksheet schema, <drawing> must
-            // precede <tableParts>/<extLst>, so insert it before them rather than appending.
-            wsPart.Worksheet.RemoveAllChildren<Drawing>();
-            var drawing = new Drawing { Id = wsPart.GetIdOfPart(drawingsPart) };
-            var tableParts = wsPart.Worksheet.GetFirstChild<TableParts>();
-            if (tableParts is not null)
-                wsPart.Worksheet.InsertBefore(drawing, tableParts);
-            else
-                wsPart.Worksheet.Append(drawing);
-            wsPart.Worksheet.Save();
+                var wsDrawing = part.WorksheetDrawing;
+                if (wsDrawing is null)
+                {
+                    wsDrawing = new Xdr.WorksheetDrawing();
+                    wsDrawing.AddNamespaceDeclaration("xdr", "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing");
+                    wsDrawing.AddNamespaceDeclaration("a",   "http://schemas.openxmlformats.org/drawingml/2006/main");
+                    part.WorksheetDrawing = wsDrawing;
+                }
+
+                foreach (var anchor in BuildGridConnectors(gridLine)) wsDrawing.Append(anchor);
+                wsDrawing.Save();
+
+                if (existing is null) LinkDrawing(gridWsPart, part);
+            }
         }
 
         return ms.ToArray();
+    }
+
+    private static WorksheetPart GetWorksheetPart(WorkbookPart wbPart, string sheetName)
+    {
+        var sheet = wbPart.Workbook.Descendants<Sheet>().First(s => s.Name == sheetName);
+        return (WorksheetPart)wbPart.GetPartById(sheet.Id!);
+    }
+
+    /// <summary>Link a worksheet to its drawing. Per CT_Worksheet, &lt;drawing&gt; must precede &lt;tableParts&gt;.</summary>
+    private static void LinkDrawing(WorksheetPart wsPart, DrawingsPart drawingsPart)
+    {
+        wsPart.Worksheet.RemoveAllChildren<Drawing>();
+        var drawing = new Drawing { Id = wsPart.GetIdOfPart(drawingsPart) };
+        var tableParts = wsPart.Worksheet.GetFirstChild<TableParts>();
+        if (tableParts is not null) wsPart.Worksheet.InsertBefore(drawing, tableParts);
+        else                        wsPart.Worksheet.Append(drawing);
+        wsPart.Worksheet.Save();
     }
 
     private static C.ChartSpace BuildChartSpace(string dataSheet, int rows, string title)
@@ -140,7 +176,7 @@ internal static class LjChartBuilder
                 new A.Text(text))))),
         new C.Overlay { Val = false });
 
-    private static void BuildDrawing(DrawingsPart drawingsPart, ChartPart chartPart)
+    private static void BuildChartDrawing(DrawingsPart drawingsPart, ChartPart chartPart)
     {
         var anchor = new Xdr.TwoCellAnchor(
             new Xdr.FromMarker(
@@ -165,5 +201,51 @@ internal static class LjChartBuilder
         drawingsPart.WorksheetDrawing.AddNamespaceDeclaration("xdr", "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing");
         drawingsPart.WorksheetDrawing.AddNamespaceDeclaration("a",   "http://schemas.openxmlformats.org/drawingml/2006/main");
         drawingsPart.WorksheetDrawing.Save();
+    }
+
+    /// <summary>
+    /// One straight connector per consecutive pair of plotted dots, anchored to the cell centres.
+    /// Points arrive date-ordered, so columns strictly increase left→right.
+    /// </summary>
+    private static IEnumerable<Xdr.TwoCellAnchor> BuildGridConnectors(IReadOnlyList<(int Row, int Col)> pts)
+    {
+        long halfW = GridColWidthEmu / 2;
+        long halfH = GridRowHeightEmu / 2;
+
+        for (var i = 0; i < pts.Count - 1; i++)
+        {
+            var (r1, c1) = pts[i];
+            var (r2, c2) = pts[i + 1];
+
+            // Bounding box top-left → bottom-right; flipV when the segment rises (r1 > r2).
+            int topRow = Math.Min(r1, r2), botRow = Math.Max(r1, r2);
+            bool flipV = r1 > r2;
+
+            yield return new Xdr.TwoCellAnchor(
+                new Xdr.FromMarker(
+                    new Xdr.ColumnId((c1 - 1).ToString()), new Xdr.ColumnOffset(halfW.ToString()),
+                    new Xdr.RowId((topRow - 1).ToString()), new Xdr.RowOffset(halfH.ToString())),
+                new Xdr.ToMarker(
+                    new Xdr.ColumnId((c2 - 1).ToString()), new Xdr.ColumnOffset(halfW.ToString()),
+                    new Xdr.RowId((botRow - 1).ToString()), new Xdr.RowOffset(halfH.ToString())),
+                BuildConnector((uint)(1000 + i), flipV),
+                new Xdr.ClientData())
+            { EditAs = Xdr.EditAsValues.OneCell };
+        }
+    }
+
+    private static Xdr.ConnectionShape BuildConnector(uint id, bool flipV)
+    {
+        var xfrm = new A.Transform2D(new A.Offset { X = 0L, Y = 0L }, new A.Extents { Cx = 0L, Cy = 0L });
+        if (flipV) xfrm.VerticalFlip = true;
+
+        return new Xdr.ConnectionShape(
+            new Xdr.NonVisualConnectionShapeProperties(
+                new Xdr.NonVisualDrawingProperties { Id = id, Name = $"LJ Line {id}" },
+                new Xdr.NonVisualConnectorShapeDrawingProperties()),
+            new Xdr.ShapeProperties(
+                xfrm,
+                new A.PresetGeometry(new A.AdjustValueList()) { Preset = A.ShapeTypeValues.Line },
+                new A.Outline(new A.SolidFill(new A.RgbColorModelHex { Val = GridLineColor })) { Width = 12700 }));
     }
 }
