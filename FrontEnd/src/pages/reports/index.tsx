@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChartBarIcon, DocumentChartBarIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, ChartBarIcon, DocumentChartBarIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import qcSampleService, { type QCSampleSummaryDto, type WestgardRules } from "@/services/qcSampleService";
 import qcResultService, { type QCSampleTargetDto, type LeveyJenningsDto } from "@/services/qcResultService";
@@ -27,6 +27,7 @@ export default function ReportsPage() {
   const [chart,      setChart]      = useState<LeveyJenningsDto | null>(null);
   const [sampleRules, setSampleRules] = useState<WestgardRules | null>(null);
   const [loading,    setLoading]    = useState(false);
+  const [exporting,  setExporting]  = useState(false);
 
   // Load QC samples once
   useEffect(() => {
@@ -56,6 +57,37 @@ export default function ReportsPage() {
       .then(r => setChart(r.data.data))
       .finally(() => setLoading(false));
   }, [sampleId, paramId, dateFrom, dateTo]);
+
+  // Download the monthly PMI Excel form for the current selection.
+  async function handleExport() {
+    if (!sampleId || !paramId) return;
+    // Pick which month the form represents (date filter wins, else backend uses latest result).
+    const anchor = dateTo || dateFrom;
+    const m = anchor ? dayjs(anchor) : null;
+    setExporting(true);
+    try {
+      const res = await qcResultService.exportLeveyJennings({
+        qcSampleId: sampleId,
+        testFileParameterId: paramId,
+        year:  m ? m.year() : undefined,
+        month: m ? m.month() + 1 : undefined,
+      });
+      const disposition = res.headers["content-disposition"] as string | undefined;
+      const match = disposition?.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
+      const fileName = match ? decodeURIComponent(match[1]) : "PMI.xlsx";
+
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -89,6 +121,15 @@ export default function ReportsPage() {
             Clear dates
           </button>
         )}
+
+        <button
+          onClick={handleExport}
+          disabled={!sampleId || !paramId || exporting}
+          title="Export form PMI (Excel) — RSUP Makassar"
+          className="ml-auto inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+          <ArrowDownTrayIcon className="size-4" />
+          {exporting ? "Exporting…" : "Export Excel"}
+        </button>
       </div>
 
       {/* Empty / guidance state */}

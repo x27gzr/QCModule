@@ -10,6 +10,7 @@ using QCModule.Application.Features.QCResults.Commands.RestoreQCResult;
 using QCModule.Application.Features.QCResults.Commands.UpdateQCResult;
 using QCModule.Application.Features.QCResults.Commands.ValidateQCResult;
 using QCModule.Application.Features.QCResults.DTOs;
+using QCModule.Application.Features.QCResults.Queries.ExportLeveyJennings;
 using QCModule.Application.Features.QCResults.Queries.GetAuthorisationSummary;
 using QCModule.Application.Features.QCResults.Queries.GetLeveyJennings;
 using QCModule.Application.Features.QCResults.Queries.GetQCResults;
@@ -136,6 +137,26 @@ public class QCResultsController(IMediator mediator) : ControllerBase
         CancellationToken ct = default)
         => Ok(await mediator.Send(
             new GetLeveyJenningsQuery(qcSampleId, testFileParameterId, dateFrom, dateTo), ct));
+
+    // Export the monthly RSUP Makassar PMI form (.xlsx)
+    [HttpGet("levey-jennings/export")]
+    [Authorize(Policy = Permissions.Reports.Export)]
+    public async Task<IActionResult> ExportLeveyJennings(
+        [FromQuery] Guid qcSampleId,
+        [FromQuery] Guid testFileParameterId,
+        [FromQuery] int? year,
+        [FromQuery] int? month,
+        CancellationToken ct = default)
+    {
+        var result = await mediator.Send(
+            new ExportLeveyJenningsQuery(qcSampleId, testFileParameterId, year, month), ct);
+
+        if (!result.Succeeded || result.Data is null)
+            return BadRequest(result);
+
+        var file = result.Data;
+        return File(file.Content, file.ContentType, file.FileName);
+    }
 }
 
 public record ValidateRequest(bool Reject, string? Note);

@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IJwtService, JwtService>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IWestgardService, WestgardService>();
+        services.AddScoped<IPmiReportExporter, PmiReportExporter>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddHostedService<ResFileWatcherService>();
 

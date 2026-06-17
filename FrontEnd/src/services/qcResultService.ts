@@ -172,6 +172,18 @@ const qcResultService = {
     dateFrom?: string;
     dateTo?: string;
   }) => api.get<{ data: LeveyJenningsDto }>("/api/qcresults/levey-jennings", { params }),
+
+  // Downloads the monthly RSUP Makassar PMI form (.xlsx) as a blob.
+  exportLeveyJennings: (params: {
+    qcSampleId: string;
+    testFileParameterId: string;
+    year?: number;
+    month?: number;
+  }) =>
+    api.get<Blob>("/api/qcresults/levey-jennings/export", {
+      params,
+      responseType: "blob",
+    }),
 };
 
 export default qcResultService;
