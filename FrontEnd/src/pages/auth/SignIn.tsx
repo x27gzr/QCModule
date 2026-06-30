@@ -1,45 +1,40 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
-import { LockClosedIcon, EnvelopeIcon } from "@heroicons/react/24/outline";
 
 import { useAuth } from "@/contexts/auth/context";
 import { APP_ROUTES } from "@/routes/common/routePaths";
-import Logo from "@/assets/appLogo.svg?react";
-import { Button, Input } from "@/components/ui";
-import settingsService, {
-  type LoginCustomization,
-  BACKGROUND_PRESETS, CIRCLE_COLORS, LOGO_SIZES,
-} from "@/services/settingsService";
+import "./SignIn.css";
 
 const schema = z.object({
-  email: z.string().min(1, "Email is required").email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
+  email: z.string().min(1, "Nama pengguna wajib diisi").email("Format email tidak valid"),
+  password: z.string().min(1, "Kata sandi wajib diisi"),
 });
 
 type FormValues = z.infer<typeof schema>;
 
-const DEFAULT_BRANDING: LoginCustomization = {
-  backgroundPreset: "gradient-blue",
-  circleColor: "blue",
-  showCircle: true,
-  logoSize: "medium",
-  appTitle: "QC Module",
-  appSubtitle: "Laboratory Quality Control",
-};
+/** Flask wordmark — `stroke` is themed per placement (dark on light, white on mobile). */
+function FlaskMark({ stroke }: { stroke: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M9 2.5h6M10 2.5v6.2L5.4 17a3 3 0 0 0 2.6 4.5h8a3 3 0 0 0 2.6-4.5L14 8.7V2.5"
+        stroke={stroke} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"
+      />
+      <path
+        d="M7.2 14.5c2 1 3.6-1 5.6 0s3.4-0.6 4-1"
+        stroke={stroke} strokeWidth="1.7" strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 function SignIn() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [branding, setBranding] = useState<LoginCustomization>(DEFAULT_BRANDING);
-
-  useEffect(() => {
-    settingsService.getLoginCustomization()
-      .then(r => setBranding(r.data.data))
-      .catch(() => {/* keep defaults */});
-  }, []);
+  const [showPw, setShowPw] = useState(false);
 
   const {
     register, handleSubmit, setError,
@@ -51,77 +46,150 @@ function SignIn() {
       await login(values.email, values.password);
       navigate(APP_ROUTES.DASHBOARD, { replace: true });
     } catch (err: any) {
-      setError("root", { message: err?.message ?? "Login failed. Please try again." });
+      setError("root", { message: err?.message ?? "Login gagal. Silakan coba lagi." });
     }
   };
 
-  const bgClass   = BACKGROUND_PRESETS[branding.backgroundPreset] ?? BACKGROUND_PRESETS["gradient-blue"];
-  const logoClass = LOGO_SIZES[branding.logoSize] ?? LOGO_SIZES["medium"];
+  const errorMessage =
+    errors.root?.message ?? errors.email?.message ?? errors.password?.message ?? "";
 
   return (
-    <main className="min-h-100vh flex">
-      {/* Left — branded panel */}
-      <div className={`relative hidden w-full place-items-center lg:grid ${bgClass}`}>
-        {branding.showCircle && (
-          <div className="absolute size-96 rounded-full opacity-20"
-            style={{ backgroundColor: CIRCLE_COLORS[branding.circleColor] ?? CIRCLE_COLORS.blue }} />
-        )}
-        <div className="relative z-10 px-8 text-center text-white">
-          <Logo className={`mx-auto ${logoClass}`} />
-          <h1 className="mt-6 text-3xl font-bold">{branding.appTitle}</h1>
-          <p className="mt-2 text-white/80">{branding.appSubtitle}</p>
-        </div>
-      </div>
+    <div className="xemr-login">
+      <div className="shell">
 
-      {/* Right — form */}
-      <div className="border-gray-150 dark:bg-dark-700 flex w-full flex-col items-center bg-white lg:max-w-md ltr:border-l rtl:border-r dark:border-transparent">
-        <div className="flex w-full max-w-sm grow flex-col justify-center p-5">
-          <div className="text-center">
-            <Logo className={`mx-auto ${logoClass} lg:hidden`} />
-            <div className="mt-4 lg:mt-0">
-              <h2 className="dark:text-dark-100 text-2xl font-semibold text-gray-600">Welcome Back</h2>
-              <p className="dark:text-dark-300 text-gray-400">Sign in to your {branding.appTitle} account</p>
+        {/* ============ LEFT: BRAND ============ */}
+        <aside className="brand">
+          <div className="wordmark">
+            <div className="mark"><FlaskMark stroke="#06312E" /></div>
+            <div>
+              <span className="name">XEMR</span>
+              <span className="sub">Electronic Medical Record</span>
             </div>
           </div>
 
-          <form className="mt-10 space-y-4" onSubmit={handleSubmit(onSubmit)}>
-            <div>
-              <Input
-                unstyled type="email" placeholder="Email address" autoComplete="email"
-                className="bg-gray-150 focus:ring-primary-500/50 dark:bg-dark-900 dark:placeholder:text-dark-200/70 w-full rounded-lg px-3 py-2 transition-colors placeholder:text-gray-400 focus:ring-3"
-                prefix={<EnvelopeIcon className="size-5 transition-colors duration-200" strokeWidth="1" />}
-                {...register("email")}
-              />
-              {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>}
-            </div>
+          <div className="qc">
+            <div className="qc-eyebrow">Kontrol mutu · langsung</div>
+            <svg className="qc-chart" viewBox="0 0 460 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              {/* reference lines */}
+              <line className="ref-line" x1="44" y1="20" x2="450" y2="20" />
+              <line className="ref-line" x1="44" y1="58" x2="450" y2="58" />
+              <line className="ref-line mean" x1="44" y1="110" x2="450" y2="110" />
+              <line className="ref-line" x1="44" y1="162" x2="450" y2="162" />
+              <line className="ref-line" x1="44" y1="200" x2="450" y2="200" />
+              <text className="ref-label" x="0" y="23">+2SD</text>
+              <text className="ref-label" x="2" y="61">+1SD</text>
+              <text className="ref-label" x="2" y="113">MEAN</text>
+              <text className="ref-label" x="4" y="165">−1SD</text>
+              <text className="ref-label" x="2" y="203">−2SD</text>
 
-            <div>
-              <Input
-                unstyled type="password" placeholder="Password" autoComplete="current-password"
-                className="bg-gray-150 focus:ring-primary-500/50 dark:bg-dark-900 dark:placeholder:text-dark-200/70 w-full rounded-lg px-3 py-2 transition-colors placeholder:text-gray-400 focus:ring-3"
-                prefix={<LockClosedIcon className="size-5 transition-colors duration-200" strokeWidth="1" />}
-                {...register("password")}
-              />
-              {errors.password && <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>}
-            </div>
+              {/* data line */}
+              <polyline className="data-line"
+                points="60,118 96,92 132,128 168,84 204,114 240,70 276,132 312,98 348,46 384,122 420,108" />
 
-            {errors.root && (
-              <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                {errors.root.message}
+              {/* data points */}
+              <g className="pt" style={{ animationDelay: "0.6s" }}><circle cx="60" cy="118" r="4" /></g>
+              <g className="pt" style={{ animationDelay: "0.85s" }}><circle cx="96" cy="92" r="4" /></g>
+              <g className="pt" style={{ animationDelay: "1.1s" }}><circle cx="132" cy="128" r="4" /></g>
+              <g className="pt" style={{ animationDelay: "1.35s" }}><circle cx="168" cy="84" r="4" /></g>
+              <g className="pt" style={{ animationDelay: "1.6s" }}><circle cx="204" cy="114" r="4" /></g>
+              <g className="pt" style={{ animationDelay: "1.85s" }}><circle cx="240" cy="70" r="4" /></g>
+              <g className="pt" style={{ animationDelay: "2.1s" }}><circle cx="276" cy="132" r="4" /></g>
+              <g className="pt" style={{ animationDelay: "2.35s" }}><circle cx="312" cy="98" r="4" /></g>
+              <g className="pt flag" style={{ animationDelay: "2.6s" }}><circle cx="348" cy="46" r="5" /></g>
+              <g className="pt" style={{ animationDelay: "2.85s" }}><circle cx="384" cy="122" r="4" /></g>
+              <g className="pt" style={{ animationDelay: "3.1s" }}><circle cx="420" cy="108" r="4" /></g>
+            </svg>
+            <div className="qc-caption">Aturan Westgard · 1 titik <b>menyimpang &gt; 2SD</b> · ditandai</div>
+          </div>
+
+          <div>
+            <div className="tagline">
+              <h1>Presisi yang bisa dipertanggungjawabkan.</h1>
+              <p>Satu pintu masuk untuk seluruh alur laboratorium — dari sampling, validasi hasil, hingga penerbitan sertifikat.</p>
+            </div>
+          </div>
+
+          <div className="status">
+            <span><span className="dot" /> Sistem aktif</span>
+            <span>v2.4.1</span>
+            <span>BLKD Sulawesi Utara</span>
+          </div>
+        </aside>
+
+        {/* ============ RIGHT: FORM ============ */}
+        <main className="panel">
+          <div className="form-wrap">
+
+            <div className="mobile-brand">
+              <div className="mark"><FlaskMark stroke="#fff" /></div>
+              <div>
+                <div className="name">XEMR</div>
+                <div className="sub">Sistem Laboratorium</div>
               </div>
-            )}
+            </div>
 
-            <Button color="primary" type="submit" className="mt-6 h-10 w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Signing in…" : "Sign In"}
-            </Button>
-          </form>
+            <div className="eyebrow">Akses Petugas</div>
+            <h2>Masuk ke akun</h2>
+            <p className="lede">Gunakan kredensial yang diberikan administrator laboratorium.</p>
 
-          <div className="dark:text-dark-300 mt-10 mb-3 flex justify-center text-xs text-gray-400">
-            <span>{branding.appTitle} &copy; {new Date().getFullYear()}</span>
+            <div className={`err${errorMessage ? " show" : ""}`} role="alert">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16.5v.5M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              <span>{errorMessage}</span>
+            </div>
+
+            <form autoComplete="off" noValidate onSubmit={handleSubmit(onSubmit)}>
+              <div className="field">
+                <label htmlFor="user">Email</label>
+                <div className="input-box">
+                  <input
+                    type="email" id="user" placeholder="mis. analis@lab.go.id"
+                    autoComplete="username" {...register("email")}
+                  />
+                </div>
+              </div>
+
+              <div className="field">
+                <label htmlFor="pw">Kata sandi</label>
+                <div className="input-box has-icon">
+                  <input
+                    type={showPw ? "text" : "password"} id="pw" placeholder="••••••••"
+                    autoComplete="current-password" {...register("password")}
+                  />
+                  <button
+                    type="button" className="toggle-pw" onClick={() => setShowPw(v => !v)}
+                    aria-label={showPw ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                  >
+                    {showPw ? (
+                      <svg viewBox="0 0 24 24" fill="none"><path d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4 4M9.4 5.2A9.6 9.6 0 0 1 12 5c6.4 0 10 7 10 7a16 16 0 0 1-3.3 4M6.2 6.2A16 16 0 0 0 2 12s3.6 7 10 7a9.6 9.6 0 0 0 2.6-.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="12" r="2.8" stroke="currentColor" strokeWidth="1.7" /></svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="row">
+                <label className="check">
+                  <input type="checkbox" />
+                  <span className="box"><svg viewBox="0 0 24 24" fill="none"><path d="m4 12 5 5 11-11" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+                  <span>Ingat saya</span>
+                </label>
+                <a href="#" className="link">Lupa kata sandi?</a>
+              </div>
+
+              <button type="submit" className={`btn${isSubmitting ? " loading" : ""}`} disabled={isSubmitting}>
+                <span className="label">Masuk</span>
+                <svg className="arr" viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                <span className="spinner" />
+              </button>
+            </form>
+
+            <p className="foot">Butuh akun? Hubungi <a href="#">administrator laboratorium</a><br />© {new Date().getFullYear()} PT Kristalab Surya Medika</p>
           </div>
-        </div>
+        </main>
+
       </div>
-    </main>
+    </div>
   );
 }
 
