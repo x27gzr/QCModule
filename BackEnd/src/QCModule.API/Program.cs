@@ -2,6 +2,7 @@ using QCModule.Application;
 using QCModule.Infrastructure;
 using QCModule.API.Extensions;
 using QCModule.API.Middleware;
+using QCModule.API.Seeding;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,6 +40,13 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// One-time data seeders. These run then exit — they do NOT start the web host.
+if (args.Contains("seed-pt-qc"))
+{
+    await PtQcDataSeeder.RunAsync(app.Services);
+    return;
+}
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
