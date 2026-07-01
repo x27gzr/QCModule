@@ -62,8 +62,8 @@ function SignIn() {
           <div className="wordmark">
             <div className="mark"><FlaskMark stroke="#06312E" /></div>
             <div>
-              <span className="name">XEMR</span>
-              <span className="sub">Electronic Medical Record</span>
+              <span className="name">MedSys</span>
+              <span className="sub">QC Module</span>
             </div>
           </div>
 
@@ -110,9 +110,9 @@ function SignIn() {
           </div>
 
           <div className="status">
-            <span><span className="dot" /> Sistem aktif</span>
+            <span><span className="dot" />Sistem aktif</span>
             <span>v2.4.1</span>
-            <span>BLKD Sulawesi Utara</span>
+            <span>RSUP Makassar</span>
           </div>
         </aside>
 
