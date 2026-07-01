@@ -62,7 +62,7 @@ function SignIn() {
           <div className="wordmark">
             <div className="mark"><FlaskMark stroke="#06312E" /></div>
             <div>
-              <span className="name">MedSys</span>
+              <span className="name">XMedSys</span>
               <span className="sub">QC Module</span>
             </div>
           </div>
