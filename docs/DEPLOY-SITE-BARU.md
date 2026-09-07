@@ -68,6 +68,23 @@ cd D:\Projects\QCModule
 
 ## 1. Buat database + login khusus
 
+> **Cek hak akses dulu.** Membuat database & login butuh hak level-server, dan login aplikasi
+> milik vendor LIS biasanya **tidak** punya itu. Jalankan:
+>
+> ```sql
+> SELECT SUSER_NAME() AS login_sekarang,
+>        IS_SRVROLEMEMBER('sysadmin')      AS sysadmin,
+>        IS_SRVROLEMEMBER('dbcreator')     AS dbcreator,
+>        IS_SRVROLEMEMBER('securityadmin') AS securityadmin;
+> ```
+>
+> Kalau semua `0`, minta pemegang `sa` / pengelola instance menjalankan blok di bawah.
+> Sesudah database & login jadi, QC Module **tidak butuh hak server apa pun** — cukup
+> `db_owner` di `QCModuleDB`.
+>
+> Gejala lain dari login terbatas: query DMV seperti `sys.dm_exec_connections` gagal dengan
+> *"VIEW SERVER STATE permission was denied"*. Itu normal dan tidak menghalangi pemasangan.
+
 Jalankan di SQL Server (SSMS). **Pakai login sendiri**, jangan login milik LIS — supaya
 QC Module tidak punya akses ke database lain:
 
