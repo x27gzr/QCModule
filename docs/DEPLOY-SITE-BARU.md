@@ -164,12 +164,27 @@ Migrasi sekaligus mengisi data awal:
 
 API sekaligus menyajikan halaman web, jadi **cukup satu proses**. Ada dua cara:
 
+**Tentukan dulu siapa yang mengakses** — ini menentukan alamat bind:
+
+| Skenario | `-Urls` | Firewall |
+|---|---|---|
+| **Hanya dibuka di mesin itu sendiri** | `http://localhost:5000` | tidak perlu |
+| Dibuka dari komputer lain di jaringan | `http://0.0.0.0:5000` | buka port 5000 |
+
+Bind ke `localhost` lebih aman: aplikasi tidak terlihat sama sekali dari jaringan.
+Nilai ini juga harus sama dengan `Cors.AllowedOrigins` di `appsettings.Production.json`.
+
 ### a. Produksi 24/7 — Windows Service ✅ *(pakai ini untuk site sungguhan)*
 
 ```powershell
 # PowerShell as Administrator
-.\deploy-windows-service.ps1 -Urls "http://0.0.0.0:5000"
+.\deploy-windows-service.ps1 -Urls "http://localhost:5000"     # akses lokal saja
+# .\deploy-windows-service.ps1 -Urls "http://0.0.0.0:5000"     # akses dari jaringan
 ```
+
+Dipasang sebagai service walau dipakai lokal saja tetap berguna: aplikasi hidup otomatis
+saat komputer menyala, dan **File Watcher** (impor otomatis file `.res` dari alat) tetap
+berjalan tanpa perlu ada yang membuka browser.
 
 Skrip ini build FrontEnd → `dotnet publish` ke `C:\QCModule` → daftarkan service `QCModule`
 dengan **start otomatis saat boot** dan **restart otomatis bila crash**.
@@ -190,11 +205,12 @@ mencoba, bukan untuk dipakai harian.
 ### Sesudah salah satu cara di atas
 
 - Pakai port 80 → wajib **as Administrator**.
-- **Buka firewall** untuk port yang dipakai, agar bisa diakses dari komputer lain:
+- **Akses lokal saja** → langsung buka `http://localhost:5000` di mesin itu. Selesai.
+- **Akses dari jaringan** → buka firewall dulu, lalu tes dari komputer lain
+  (`http://<ip-mesin-aplikasi>:5000`):
   ```powershell
   New-NetFirewallRule -DisplayName "QC Module" -Direction Inbound -Protocol TCP -LocalPort 5000 -Action Allow
   ```
-- Cek dari komputer lain: `http://<ip-mesin-aplikasi>:5000` — halaman login harus muncul.
 
 ---
 
