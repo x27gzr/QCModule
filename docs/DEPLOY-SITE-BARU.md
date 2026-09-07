@@ -7,17 +7,42 @@ Contoh di dokumen ini memakai **RSIA Ananda** — ganti sesuai site.
 > `QCModuleDB` melayani satu institusi. Tiap site punya database + aplikasi sendiri, sehingga
 > data antar-RS terpisah total.
 
+## Topologi
+
+Database dan aplikasi **tidak harus** di mesin yang sama:
+
+```
+┌─────────────────────────────┐         ┌──────────────────────────────┐
+│  Mesin Windows (nyala 24/7) │  1433   │  SQL Server                  │
+│  QC Module API + web        │────────▶│  QCModuleDB                  │
+│  (Windows Service)          │         │  (boleh 1 instance dgn LIS)  │
+└─────────────────────────────┘         └──────────────────────────────┘
+        user ──▶ http://<ip-mesin>:5000
+```
+
+**Contoh RSIA Ananda:** SQL Server 2017 jalan di Docker (`192.168.6.8`) dan sudah menampung
+database LIS `XIMPULAB`; QC Module menambah database `QCModuleDB` **berdampingan** di instance
+yang sama, sementara aplikasinya dipasang di mesin Windows terpisah yang menyala 24 jam.
+
+> ⚠️ Menumpang instance yang sama **boleh**, tapi harus **database terpisah**. Jangan pernah
+> membuat tabel QC Module di dalam database LIS — migrasi EF membuat/mengubah tabel dan bisa
+> menggugurkan dukungan vendor.
+
 ---
 
-## 0. Prasyarat di server
+## 0. Prasyarat
+
+**Di mesin aplikasi (Windows):**
 
 | Kebutuhan | Keterangan |
 |---|---|
-| Windows Server / Windows 10+ | Server lab |
-| SQL Server | Instance aktif; catat nama instance (`localhost` atau `localhost\NAMA`) |
-| .NET 9 SDK | Untuk build & `dotnet ef` |
+| Windows 10+ / Windows Server | Menyala 24 jam |
+| .NET 9 SDK | Untuk build, publish & `dotnet ef` |
 | Node.js 20+ | Untuk build FrontEnd |
 | `dotnet-ef` | `dotnet tool install --global dotnet-ef` |
+| Akses jaringan ke SQL | Port SQL (biasanya 1433) harus terbuka dari mesin ini |
+
+**Di sisi SQL Server:** instance aktif, dan Anda tahu alamat + port-nya.
 
 Ambil kode:
 ```powershell
@@ -27,13 +52,25 @@ cd D:\Projects\QCModule
 
 ---
 
-## 1. Buat database
+## 1. Buat database + login khusus
+
+Jalankan di SQL Server (SSMS). **Pakai login sendiri**, jangan login milik LIS — supaya
+QC Module tidak punya akses ke database lain:
 
 ```sql
-CREATE DATABASE QCModuleDB;
+-- Samakan collation dengan default umum agar perbandingan string tidak case-sensitive.
+CREATE DATABASE QCModuleDB COLLATE SQL_Latin1_General_CP1_CI_AS;
+GO
+CREATE LOGIN qcmodule WITH PASSWORD = '<password-kuat>';
+GO
+USE QCModuleDB;
+CREATE USER qcmodule FOR LOGIN qcmodule;
+ALTER ROLE db_owner ADD MEMBER qcmodule;   -- diperlukan agar migrasi bisa membuat tabel
 ```
 
-Login yang dipakai aplikasi harus punya hak `db_owner` atas database itu.
+> **Kalau SQL jalan di Docker:** pastikan container memakai **volume persisten** — tanpa itu
+> data hilang saat container dibuat ulang. Dan **tambahkan `QCModuleDB` ke jadwal backup**;
+> database baru tidak otomatis ikut maintenance plan yang sudah ada.
 
 ---
 
@@ -45,7 +82,10 @@ sendiri. Buat di `BackEnd\src\QCModule.API\appsettings.Production.json`:
 ```jsonc
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Database=QCModuleDB;User Id=sa;Password=<PASSWORD-SITE-INI>;TrustServerCertificate=True;"
+    // SQL di mesin/container lain -> pakai IP + port, bukan "localhost".
+    // Encrypt=True adalah default driver; TrustServerCertificate=True wajib bila SQL
+    // memakai sertifikat self-signed (umum pada SQL di Docker) — tanpa itu koneksi ditolak.
+    "DefaultConnection": "Server=192.168.6.8,1433;Database=QCModuleDB;User Id=qcmodule;Password=<PASSWORD-SITE-INI>;Encrypt=True;TrustServerCertificate=True;"
   },
   "JwtSettings": {
     // WAJIB diganti per site — minimal 32 karakter acak. Jangan pakai nilai dari repo.
@@ -88,18 +128,39 @@ Migrasi sekaligus mengisi data awal:
 
 ## 4. Build & jalankan
 
+API sekaligus menyajikan halaman web, jadi **cukup satu proses**. Ada dua cara:
+
+### a. Produksi 24/7 — Windows Service ✅ *(pakai ini untuk site sungguhan)*
+
+```powershell
+# PowerShell as Administrator
+.\deploy-windows-service.ps1 -Urls "http://0.0.0.0:5000"
+```
+
+Skrip ini build FrontEnd → `dotnet publish` ke `C:\QCModule` → daftarkan service `QCModule`
+dengan **start otomatis saat boot** dan **restart otomatis bila crash**.
+
+- Update versi berikutnya: `git pull`, lalu jalankan ulang skrip yang sama.
+- Kelola lewat `services.msc`, atau `Restart-Service QCModule`.
+- Log aplikasi: `C:\QCModule\logs\`.
+
+### b. Uji coba sementara — konsol
+
 ```powershell
 .\start-production.ps1 -Urls "http://0.0.0.0:5000"
 ```
 
-Script ini: install dependency FrontEnd → `vite build` → salin `dist` ke `wwwroot` API →
-jalankan API. API sekaligus menyajikan halaman web, jadi **cukup satu proses**.
+Jalan di jendela konsol; **mati begitu jendela ditutup atau mesin reboot**. Hanya untuk
+mencoba, bukan untuk dipakai harian.
 
-- Pakai port 80 (`-Urls "http://0.0.0.0:80"`) → jalankan PowerShell **as Administrator**.
-- Buka firewall untuk port yang dipakai agar bisa diakses dari komputer lain.
-- Untuk jalan permanen, daftarkan sebagai Windows Service (mis. NSSM) atau host di IIS.
+### Sesudah salah satu cara di atas
 
-Cek: buka `http://<ip-server>:5000` dari komputer lain — halaman login harus muncul.
+- Pakai port 80 → wajib **as Administrator**.
+- **Buka firewall** untuk port yang dipakai, agar bisa diakses dari komputer lain:
+  ```powershell
+  New-NetFirewallRule -DisplayName "QC Module" -Direction Inbound -Protocol TCP -LocalPort 5000 -Action Allow
+  ```
+- Cek dari komputer lain: `http://<ip-mesin-aplikasi>:5000` — halaman login harus muncul.
 
 ---
 
@@ -167,8 +228,9 @@ Setelah itu QC harian sudah bisa diinput dan Levey-Jennings/Westgard langsung ja
 
 ## Catatan pemeliharaan
 
-- **Update aplikasi**: `git pull` → jalankan ulang `start-production.ps1` (rebuild FrontEnd +
-  restart API). Kalau ada migrasi baru, jalankan lagi `dotnet ef database update`.
+- **Update aplikasi**: `git pull` → jalankan ulang `deploy-windows-service.ps1` (stop service,
+  rebuild, publish, start lagi). Kalau ada migrasi baru, jalankan lagi `dotnet ef database update`.
 - **Backup**: cukup database `QCModuleDB` — semua konfigurasi & master data ada di sana.
+  Pastikan database ini benar-benar masuk maintenance plan / jadwal backup yang berjalan.
 - **Reset password darurat**: `POST /api/setup/reset-password` dengan body
   `{ "secret": "<Setup:ResetSecret>", "email": "...", "newPassword": "..." }`.

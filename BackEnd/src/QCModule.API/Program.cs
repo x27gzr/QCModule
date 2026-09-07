@@ -6,6 +6,11 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Dukungan Windows Service (deploy 24/7). Tanpa ini, saat dijalankan sebagai service
+// ContentRoot menjadi C:\Windows\System32 sehingga wwwroot (SPA) tidak ketemu dan
+// halaman web gagal disajikan. No-op saat dijalankan biasa (dotnet run / konsol).
+builder.Host.UseWindowsService();
+
 builder.Host.UseSerilog((context, services, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
     .ReadFrom.Services(services)
