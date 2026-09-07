@@ -40,9 +40,23 @@ yang sama, sementara aplikasinya dipasang di mesin Windows terpisah yang menyala
 | .NET 9 SDK | Untuk build, publish & `dotnet ef` |
 | Node.js 20+ | Untuk build FrontEnd |
 | `dotnet-ef` | `dotnet tool install --global dotnet-ef` |
-| Akses jaringan ke SQL | Port SQL (biasanya 1433) harus terbuka dari mesin ini |
+| Akses jaringan ke SQL | Port SQL (biasanya 1433) harus tembus **dari mesin ini** |
 
-**Di sisi SQL Server:** instance aktif, dan Anda tahu alamat + port-nya.
+**Di sisi SQL Server:** instance aktif dan alamatnya diketahui.
+
+Sebelum lanjut, buktikan dulu mesin aplikasi bisa menjangkau SQL — ini sumber masalah
+paling sering, dan lebih menentukan daripada tebak-tebakan port:
+
+```powershell
+Test-NetConnection -ComputerName 192.168.6.8 -Port 1433    # cari: TcpTestSucceeded : True
+```
+
+Ragu port-nya berapa? Jalankan ini di SSMS yang sudah terhubung ke SQL tersebut:
+
+```sql
+SELECT local_net_address, local_tcp_port
+FROM sys.dm_exec_connections WHERE session_id = @@SPID;
+```
 
 Ambil kode:
 ```powershell
@@ -82,10 +96,13 @@ sendiri. Buat di `BackEnd\src\QCModule.API\appsettings.Production.json`:
 ```jsonc
 {
   "ConnectionStrings": {
-    // SQL di mesin/container lain -> pakai IP + port, bukan "localhost".
+    // SQL di mesin/container lain -> pakai IP, bukan "localhost".
+    // Port boleh dihilangkan bila SQL memakai default instance di 1433 (tanda-tandanya:
+    // di SSMS cukup mengetik IP saja tanpa ",port" dan tanpa "\NamaInstance").
+    // Kalau port tidak standar, tulis "Server=192.168.6.8,<port>".
     // Encrypt=True adalah default driver; TrustServerCertificate=True wajib bila SQL
     // memakai sertifikat self-signed (umum pada SQL di Docker) — tanpa itu koneksi ditolak.
-    "DefaultConnection": "Server=192.168.6.8,1433;Database=QCModuleDB;User Id=qcmodule;Password=<PASSWORD-SITE-INI>;Encrypt=True;TrustServerCertificate=True;"
+    "DefaultConnection": "Server=192.168.6.8;Database=QCModuleDB;User Id=qcmodule;Password=<PASSWORD-SITE-INI>;Encrypt=True;TrustServerCertificate=True;"
   },
   "JwtSettings": {
     // WAJIB diganti per site — minimal 32 karakter acak. Jangan pakai nilai dari repo.
