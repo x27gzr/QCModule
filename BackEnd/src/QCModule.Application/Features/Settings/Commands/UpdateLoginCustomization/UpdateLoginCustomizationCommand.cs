@@ -10,7 +10,8 @@ public record UpdateLoginCustomizationCommand(
     bool   ShowCircle,
     string LogoSize,
     string AppTitle,
-    string AppSubtitle
+    string AppSubtitle,
+    string InstitutionName
 ) : IRequest<Result<LoginCustomizationDto>>;
 
 /// <summary>Resets login customization back to factory defaults.</summary>

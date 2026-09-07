@@ -49,6 +49,7 @@ public class PmiReportExporter : IPmiReportExporter
         {
             gridLine = FillWorksheet(wb.Worksheet("Sheet2"), model, chartable);
             FillEvaluation(wb.Worksheet("PMI"),   model);
+            ApplyInstitutionHeader(wb, model.InstitutionName);
             if (chartable) BuildChartData(wb, model);
 
             using var output = new MemoryStream();
@@ -65,6 +66,20 @@ public class PmiReportExporter : IPmiReportExporter
                 "Sheet2", gridLine);
 
         return new FileExportResult(bytes, "PMI.xlsx", XlsxContentType);
+    }
+
+    /// <summary>
+    /// Overwrites the institution name pre-printed in the template kop so the same form can be
+    /// used by any site. Template ships with "RSUP MAKASSAR" (Sheet2!B1) and
+    /// "LABORATORIUM RSUP MAKASSAR" (PMI!A1); blank setting keeps the template as-is.
+    /// </summary>
+    private static void ApplyInstitutionHeader(XLWorkbook wb, string? institutionName)
+    {
+        var name = (institutionName ?? string.Empty).Trim();
+        if (name.Length == 0) return;
+
+        wb.Worksheet("Sheet2").Cell("B1").Value = name.ToUpperInvariant();
+        wb.Worksheet("PMI").Cell("A1").Value    = $"LABORATORIUM {name.ToUpperInvariant()}";
     }
 
     /// <summary>Hidden data sheet that backs the native line chart.</summary>

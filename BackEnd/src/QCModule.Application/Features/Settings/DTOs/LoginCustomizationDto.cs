@@ -6,5 +6,8 @@ public record LoginCustomizationDto(
     bool   ShowCircle,
     string LogoSize,           // small | medium | large
     string AppTitle,
-    string AppSubtitle
+    string AppSubtitle,
+    // Nama institusi/RS pemakai (mis. "RSIA Ananda"). Tampil di halaman login dan
+    // dipakai sebagai kop form PMI. Kosong = tidak ditampilkan / kop template dibiarkan apa adanya.
+    string InstitutionName
 );

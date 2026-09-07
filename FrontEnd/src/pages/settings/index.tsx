@@ -167,6 +167,18 @@ export default function SettingsPage() {
             <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">App Subtitle</label>
             <input value={form.appSubtitle} onChange={e => set("appSubtitle", e.target.value)} className={inputCls} />
           </div>
+          <div>
+            <label className="dark:text-dark-300 mb-1 block text-sm font-medium text-gray-600">Nama Institusi / RS</label>
+            <input
+              value={form.institutionName ?? ""}
+              onChange={e => set("institutionName", e.target.value)}
+              placeholder="mis. RSIA Ananda"
+              className={inputCls}
+            />
+            <p className="dark:text-dark-400 mt-1 text-xs text-gray-500">
+              Tampil di halaman login dan dipakai sebagai kop form PMI. Kosongkan untuk memakai kop bawaan template.
+            </p>
+          </div>
         </div>
 
         {/* Background preset */}
@@ -239,6 +251,9 @@ export default function SettingsPage() {
               <Logo className={`mx-auto ${LOGO_SIZES[form.logoSize]}`} />
               <h2 className="mt-4 text-xl font-bold">{form.appTitle || "App Title"}</h2>
               <p className="mt-1 text-sm text-white/80">{form.appSubtitle}</p>
+              {form.institutionName && (
+                <p className="mt-3 text-xs tracking-wide text-white/70">{form.institutionName}</p>
+              )}
             </div>
           </div>
           {/* Right form mock */}

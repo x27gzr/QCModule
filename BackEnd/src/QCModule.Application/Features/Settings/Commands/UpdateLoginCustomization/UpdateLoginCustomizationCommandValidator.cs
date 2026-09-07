@@ -15,5 +15,6 @@ public class UpdateLoginCustomizationCommandValidator : AbstractValidator<Update
         RuleFor(x => x.LogoSize).Must(s => Sizes.Contains(s)).WithMessage("Invalid logo size.");
         RuleFor(x => x.AppTitle).NotEmpty().MaximumLength(60);
         RuleFor(x => x.AppSubtitle).MaximumLength(120);
+        RuleFor(x => x.InstitutionName).MaximumLength(120);
     }
 }

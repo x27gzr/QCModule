@@ -125,7 +125,7 @@ export default function ReportsPage() {
         <button
           onClick={handleExport}
           disabled={!sampleId || !paramId || exporting}
-          title="Export form PMI (Excel) — RSUP Makassar"
+          title="Export form PMI (Excel) — kop mengikuti Nama Institusi di Settings"
           className="ml-auto inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
           <ArrowDownTrayIcon className="size-4" />
           {exporting ? "Exporting…" : "Export Excel"}

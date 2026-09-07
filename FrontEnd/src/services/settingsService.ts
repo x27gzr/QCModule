@@ -7,6 +7,8 @@ export interface LoginCustomization {
   logoSize: string;
   appTitle: string;
   appSubtitle: string;
+  /** Nama institusi/RS (mis. "RSIA Ananda") — tampil di login & jadi kop form PMI. */
+  institutionName: string;
 }
 
 export interface FileWatcherSettings {

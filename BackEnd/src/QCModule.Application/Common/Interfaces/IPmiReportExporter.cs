@@ -31,7 +31,10 @@ public record PmiReportModel(
     double                    CV,
     double                    Minus2SD,
     double                    Plus2SD,
-    IReadOnlyList<PmiReportRow> Rows);
+    IReadOnlyList<PmiReportRow> Rows,
+    // Nama institusi untuk kop form (dari Settings → institution_name).
+    // Kosong = biarkan kop bawaan template.
+    string                    InstitutionName = "");
 
 /// <summary>Result of generating a downloadable file.</summary>
 public record FileExportResult(byte[] Content, string FileName, string ContentType);

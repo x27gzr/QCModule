@@ -13,6 +13,7 @@ public class ExportLeveyJenningsQueryHandler(
     IRepository<TestFileParameter> paramRepo,
     IRepository<QCSampleTarget>    targetRepo,
     IRepository<Instrument>        instrumentRepo,
+    IRepository<AppSetting>        settingsRepo,
     IPmiReportExporter             exporter)
     : IRequestHandler<ExportLeveyJenningsQuery, Result<FileExportResult>>
 {
@@ -73,6 +74,10 @@ public class ExportLeveyJenningsQueryHandler(
             cv   = mean != 0 ? sd / mean * 100 : 0;
         }
 
+        // Kop form mengikuti institusi yang dikonfigurasi (Settings → institution_name).
+        var institutionName = (await settingsRepo.FindAsync(s => s.Key == "institution_name", cancellationToken))
+            .FirstOrDefault()?.Value ?? string.Empty;
+
         var model = new PmiReportModel(
             ParameterName:   param.ParameterName,
             Unit:            param.Unit,
@@ -89,7 +94,8 @@ public class ExportLeveyJenningsQueryHandler(
             CV:              cv,
             Minus2SD:        mean - 2 * sd,
             Plus2SD:         mean + 2 * sd,
-            Rows:            monthRows);
+            Rows:            monthRows,
+            InstitutionName: institutionName);
 
         var file = exporter.Generate(model);
 

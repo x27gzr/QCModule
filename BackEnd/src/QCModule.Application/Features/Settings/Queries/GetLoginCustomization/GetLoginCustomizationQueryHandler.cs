@@ -23,7 +23,8 @@ public class GetLoginCustomizationQueryHandler(IRepository<AppSetting> settingsR
             ShowCircle:       Get("login_show_circle", "true") == "true",
             LogoSize:         Get("login_logo_size", "medium"),
             AppTitle:         Get("app_title", "QC Module"),
-            AppSubtitle:      Get("app_subtitle", "Laboratory Quality Control"));
+            AppSubtitle:      Get("app_subtitle", "Laboratory Quality Control"),
+            InstitutionName:  Get("institution_name", string.Empty));
 
         return Result<LoginCustomizationDto>.Success(dto);
     }

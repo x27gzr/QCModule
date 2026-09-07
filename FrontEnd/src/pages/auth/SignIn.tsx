@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/contexts/auth/context";
 import { APP_ROUTES } from "@/routes/common/routePaths";
+import settingsService from "@/services/settingsService";
 import "./SignIn.css";
 
 const schema = z.object({
@@ -36,6 +37,36 @@ function SignIn() {
   const { login } = useAuth();
   const [showPw, setShowPw] = useState(false);
 
+  // Branding diambil dari Settings (endpoint publik) supaya tiap site cukup mengubah
+  // konfigurasi, tanpa ubah kode. Default dipakai selama memuat / bila endpoint gagal —
+  // login harus tetap bisa dipakai walau branding tak terambil.
+  const [brand, setBrand] = useState({
+    appTitle: "QC Module",
+    appSubtitle: "Laboratory Quality Control",
+    institutionName: "",
+  });
+
+  useEffect(() => {
+    let alive = true;
+    settingsService
+      .getLoginCustomization()
+      .then((res) => {
+        const d = res.data?.data;
+        if (!alive || !d) return;
+        setBrand({
+          appTitle: d.appTitle || "QC Module",
+          appSubtitle: d.appSubtitle || "",
+          institutionName: d.institutionName || "",
+        });
+      })
+      .catch(() => {
+        /* biarkan default */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const {
     register, handleSubmit, setError,
     formState: { errors, isSubmitting },
@@ -62,8 +93,8 @@ function SignIn() {
           <div className="wordmark">
             <div className="mark"><FlaskMark stroke="#06312E" /></div>
             <div>
-              <span className="name">XMedSys</span>
-              <span className="sub">QC Module</span>
+              <span className="name">{brand.appTitle}</span>
+              <span className="sub">{brand.appSubtitle}</span>
             </div>
           </div>
 
@@ -112,7 +143,7 @@ function SignIn() {
           <div className="status">
             <span><span className="dot" />Sistem aktif</span>
             <span>v2.4.1</span>
-            <span>RSUP Makassar</span>
+            {brand.institutionName && <span>{brand.institutionName}</span>}
           </div>
         </aside>
 
@@ -123,8 +154,8 @@ function SignIn() {
             <div className="mobile-brand">
               <div className="mark"><FlaskMark stroke="#fff" /></div>
               <div>
-                <div className="name">XEMR</div>
-                <div className="sub">Sistem Laboratorium</div>
+                <div className="name">{brand.appTitle}</div>
+                <div className="sub">{brand.appSubtitle}</div>
               </div>
             </div>
 

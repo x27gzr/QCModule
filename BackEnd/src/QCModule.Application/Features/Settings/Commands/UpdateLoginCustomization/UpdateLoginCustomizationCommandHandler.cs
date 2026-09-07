@@ -21,6 +21,7 @@ public class UpdateLoginCustomizationCommandHandler(
             ["login_logo_size"]         = request.LogoSize,
             ["app_title"]               = request.AppTitle.Trim(),
             ["app_subtitle"]            = request.AppSubtitle.Trim(),
+            ["institution_name"]        = (request.InstitutionName ?? string.Empty).Trim(),
         };
 
         await Upsert(settingsRepo, values, cancellationToken);
@@ -28,7 +29,8 @@ public class UpdateLoginCustomizationCommandHandler(
 
         return Result<LoginCustomizationDto>.Success(
             new LoginCustomizationDto(request.BackgroundPreset, request.CircleColor, request.ShowCircle,
-                request.LogoSize, request.AppTitle.Trim(), request.AppSubtitle.Trim()),
+                request.LogoSize, request.AppTitle.Trim(), request.AppSubtitle.Trim(),
+                (request.InstitutionName ?? string.Empty).Trim()),
             "Login customization saved.");
     }
 
@@ -67,13 +69,15 @@ public class ResetLoginCustomizationCommandHandler(
             ["login_logo_size"]         = "medium",
             ["app_title"]               = "QC Module",
             ["app_subtitle"]            = "Laboratory Quality Control",
+            ["institution_name"]        = string.Empty,
         };
 
         await UpdateLoginCustomizationCommandHandler.Upsert(settingsRepo, defaults, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result<LoginCustomizationDto>.Success(
-            new LoginCustomizationDto("gradient-blue", "blue", true, "medium", "QC Module", "Laboratory Quality Control"),
+            new LoginCustomizationDto("gradient-blue", "blue", true, "medium", "QC Module",
+                "Laboratory Quality Control", string.Empty),
             "Login customization reset to defaults.");
     }
 }
