@@ -114,11 +114,18 @@ if ((Test-Path $ConfigPath) -and -not $Force) {
     Write-Host "  JWT secret & reset secret dibuat acak. File ini di-gitignore (tidak ikut ter-commit)." -ForegroundColor DarkGray
 }
 
-# ── 4. Migrasi ───────────────────────────────────────────────────────────────
+# ── 4. Restore paket ─────────────────────────────────────────────────────────
+# Di mesin yang baru clone, folder obj/ masih kosong. Tanpa restore, dotnet ef
+# gagal dengan NETSDK1004 (project.assets.json tidak ditemukan).
+Say "Restore paket NuGet (perlu internet)"
+dotnet restore $ApiProject
+if ($LASTEXITCODE -ne 0) { Write-Error "Restore gagal - periksa koneksi internet / akses ke nuget.org."; exit 1 }
+
+# ── 5. Migrasi ───────────────────────────────────────────────────────────────
 Say "Jalankan migrasi (membuat tabel + data awal)"
 $env:ASPNETCORE_ENVIRONMENT = "Production"
 dotnet ef database update -p $InfraProj -s $ApiProject
-if ($LASTEXITCODE -ne 0) { Write-Error "Migrasi gagal — lihat pesan di atas."; exit 1 }
+if ($LASTEXITCODE -ne 0) { Write-Error "Migrasi gagal - lihat pesan di atas."; exit 1 }
 
 Say "Selesai" "Green"
 Write-Host @"
